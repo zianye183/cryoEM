@@ -21,7 +21,7 @@ from segmentation_integration.cryosparc_io import (
     load_particles_cs,
     resolve_micrograph_path,
 )
-from segmentation_integration.visualization import read_mode2_mrc
+from segmentation_integration.mrc_io import read_mode2_mrc
 
 
 @dataclass(frozen=True)

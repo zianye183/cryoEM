@@ -1,6 +1,8 @@
 import tempfile
 import unittest
 from pathlib import Path
+import subprocess
+import sys
 
 import numpy as np
 
@@ -8,6 +10,15 @@ from segmentation_integration.scripts.run_local_vesicle_picker import micrograph
 
 
 class LocalVesiclePickerTests(unittest.TestCase):
+    def test_local_runner_import_does_not_load_matplotlib(self) -> None:
+        code = (
+            "import sys; "
+            "import segmentation_integration.scripts.run_local_vesicle_picker; "
+            "print('matplotlib' in sys.modules)"
+        )
+        result = subprocess.run([sys.executable, "-c", code], check=True, text=True, capture_output=True)
+        self.assertEqual(result.stdout.strip(), "False")
+
     def test_micrograph_records_from_particles_resolves_unique_uid_paths(self) -> None:
         dtype = [
             ("location/micrograph_uid", "<u8"),

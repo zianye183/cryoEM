@@ -4,10 +4,10 @@ from pathlib import Path
 
 import numpy as np
 
+from segmentation_integration.mrc_io import write_mode2_mrc_for_test
 from segmentation_integration.visualization import (
     render_mask_png,
     render_overlay,
-    write_mode2_mrc_for_test,
 )
 
 

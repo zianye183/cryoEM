@@ -3,10 +3,15 @@ import unittest
 from pathlib import Path
 import subprocess
 import sys
+from io import StringIO
 
 import numpy as np
 
-from segmentation_integration.scripts.run_local_vesicle_picker import micrograph_records_from_particles
+from segmentation_integration.scripts.run_local_vesicle_picker import (
+    MicrographRecord,
+    emit_progress,
+    micrograph_records_from_particles,
+)
 
 
 class LocalVesiclePickerTests(unittest.TestCase):
@@ -40,6 +45,24 @@ class LocalVesiclePickerTests(unittest.TestCase):
 
         self.assertEqual([record.uid for record in records], [7, 8])
         self.assertEqual([record.path.name for record in records], ["mic_a.mrc", "mic_b.mrc"])
+
+    def test_emit_progress_writes_cluster_log_friendly_line(self) -> None:
+        stream = StringIO()
+
+        emit_progress(
+            stream,
+            index=2,
+            total=5,
+            record=MicrographRecord(uid=17, path=Path("/data/mic.mrc")),
+            found_masks=4,
+            filtered_masks=3,
+            status="done",
+        )
+
+        self.assertEqual(
+            stream.getvalue().strip(),
+            "[local vesicle picker] 2/5 uid=17 status=done found=4 filtered=3 mic=mic.mrc",
+        )
 
 
 if __name__ == "__main__":

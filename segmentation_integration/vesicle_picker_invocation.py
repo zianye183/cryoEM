@@ -387,6 +387,8 @@ def render_end_to_end_script(
         find_parameters,
         "--filter-parameters",
         filter_parameters,
+        "--progress-every",
+        "1",
     ]
     vesicle_picker_commands = (
         quote_command(local_vesicle_command)
@@ -405,9 +407,13 @@ set -euo pipefail
 WID={shlex.quote(workspace_id)}
 VESICLE_PICKER_DIR={shlex.quote(str(vesicle_picker_dir))}
 
+echo "[segmentation integration] generating vesicle masks"
 {vesicle_picker_commands}
 
+echo "[segmentation integration] visualizing masks"
 {quote_command(visualize_command)}
+
+echo "[segmentation integration] filtering particle picks"
 {quote_command(filter_command)}
 """
 

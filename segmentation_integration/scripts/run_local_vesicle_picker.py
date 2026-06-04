@@ -38,6 +38,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--find-parameters", type=Path, required=True)
     parser.add_argument("--filter-parameters", type=Path, required=True)
     parser.add_argument("--limit", type=int, default=0, help="Maximum micrographs to process; 0 means all.")
+    parser.add_argument(
+        "--progress-every",
+        type=int,
+        default=1,
+        help="Write progress every N micrographs; 0 disables progress lines.",
+    )
     return parser.parse_args()
 
 
@@ -64,6 +70,8 @@ def run_local_vesicle_picker(
     find_parameters: Path,
     filter_parameters: Path,
     limit: int = 0,
+    progress_every: int = 1,
+    progress_stream=sys.stderr,
 ) -> dict[str, int]:
     sys.path.insert(0, str(vesicle_picker_dir))
     from vesicle_picker import external_export, generate_masks, helpers, postprocess, preprocess
@@ -90,7 +98,10 @@ def run_local_vesicle_picker(
     found_written = 0
     filtered_written = 0
     skipped_empty = 0
-    for record in records:
+    total = len(records)
+    for index, record in enumerate(records, start=1):
+        if should_emit_progress(index, progress_every):
+            emit_progress(progress_stream, index=index, total=total, record=record, status="start")
         image_fullres = read_mode2_mrc(record.path)
         preprocessed_micrograph = preprocess.preprocess_micrograph(
             image_fullres,
@@ -117,6 +128,16 @@ def run_local_vesicle_picker(
         processed += 1
         if not masks:
             skipped_empty += 1
+            if should_emit_progress(index, progress_every):
+                emit_progress(
+                    progress_stream,
+                    index=index,
+                    total=total,
+                    record=record,
+                    found_masks=0,
+                    filtered_masks=0,
+                    status="empty",
+                )
             continue
 
         postprocessed_masks = []
@@ -151,6 +172,16 @@ def run_local_vesicle_picker(
         filtered_masks = postprocess.apply_filters(postprocessed_masks, str(filter_parameters))
         filtered_masks = [mask for mask in filtered_masks if mask is not None]
         if not filtered_masks:
+            if should_emit_progress(index, progress_every):
+                emit_progress(
+                    progress_stream,
+                    index=index,
+                    total=total,
+                    record=record,
+                    found_masks=len(postprocessed_masks),
+                    filtered_masks=0,
+                    status="filtered_empty",
+                )
             continue
         filtered_path = filtered_dir / f"{record.uid}_vesicles_filtered.pkl"
         external_export.export_masks_to_disk(
@@ -160,6 +191,16 @@ def run_local_vesicle_picker(
             compression="uint64",
         )
         filtered_written += 1
+        if should_emit_progress(index, progress_every):
+            emit_progress(
+                progress_stream,
+                index=index,
+                total=total,
+                record=record,
+                found_masks=len(postprocessed_masks),
+                filtered_masks=len(filtered_masks),
+                status="done",
+            )
 
     return {
         "micrographs_seen": len(records),
@@ -168,6 +209,34 @@ def run_local_vesicle_picker(
         "filtered_mask_files": filtered_written,
         "empty_micrographs": skipped_empty,
     }
+
+
+def should_emit_progress(index: int, progress_every: int) -> bool:
+    return progress_every > 0 and index % progress_every == 0
+
+
+def emit_progress(
+    stream,
+    *,
+    index: int,
+    total: int,
+    record: MicrographRecord,
+    status: str,
+    found_masks: int | None = None,
+    filtered_masks: int | None = None,
+) -> None:
+    parts = [
+        "[local vesicle picker]",
+        f"{index}/{total}",
+        f"uid={record.uid}",
+        f"status={status}",
+    ]
+    if found_masks is not None:
+        parts.append(f"found={found_masks}")
+    if filtered_masks is not None:
+        parts.append(f"filtered={filtered_masks}")
+    parts.append(f"mic={record.path.name}")
+    print(" ".join(parts), file=stream, flush=True)
 
 
 def main() -> None:
@@ -179,6 +248,7 @@ def main() -> None:
         find_parameters=args.find_parameters,
         filter_parameters=args.filter_parameters,
         limit=args.limit,
+        progress_every=args.progress_every,
     )
     print(json.dumps(summary, indent=2))
 

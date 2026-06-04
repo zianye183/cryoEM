@@ -32,12 +32,8 @@ First prepare Vesicle Picker parameter files and a runnable shell script:
 ```bash
 python segmentation_integration/scripts/prepare_vesicle_picker_run.py \
   --dataset raw \
+  --local-micrographs \
   --output-dir /path/to/segmentation_run \
-  --csparc-login /path/to/csparc_login.ini \
-  --project-id PXX \
-  --workspace-id WXX \
-  --job-id JXX \
-  --job-type curate \
   --model-weights-path /path/to/sam_vit_l_0b3195.pth \
   --filter-output-dir /path/to/segmentation_run/filtered_particles
 ```
@@ -46,6 +42,12 @@ Use `--dataset draco` for the Draco-denoised micrographs. The preset locates
 the one `.cs` and one `.csg` file in the corresponding CryoSPARC exported
 particle result-group directory. The explicit path flags still exist as
 overrides for nonstandard runs.
+
+`--local-micrographs` runs SAM/Vesicle Picker on the preset MRC directory
+instead of asking Vesicle Picker to pull micrographs from a CryoSPARC job, so
+`--csparc-login`, `--project-id`, `--workspace-id`, and `--job-id` are not
+needed. Omit `--local-micrographs` only when you want stock Vesicle Picker
+CryoSPARC import behavior.
 
 This writes:
 

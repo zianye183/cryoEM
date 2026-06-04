@@ -77,6 +77,35 @@ class VesiclePickerInvocationTests(unittest.TestCase):
         self.assertIn("J70_particles_exported.cs", script)
         self.assertIn("draco_pretrained_fuller_subset", script)
 
+    def test_prepare_local_micrograph_run_does_not_require_cryosparc_job_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            particle_export_dir = root / "J71_particles"
+            particle_export_dir.mkdir()
+            (particle_export_dir / "J71_particles_exported.cs").write_bytes(b"")
+            (particle_export_dir / "J71_particles_exported.csg").write_text("{}")
+
+            summary = prepare_vesicle_picker_run_for_dataset(
+                dataset="raw",
+                output_dir=root / "run",
+                particle_export_dir=particle_export_dir,
+                local_micrographs=True,
+                model_weights_path=Path("/cluster/sam_vit_l_0b3195.pth"),
+                filter_output_dir=root / "filtered",
+            )
+
+            find_ini = Path(summary["find_parameters"]).read_text()
+            filter_ini = Path(summary["filter_parameters"]).read_text()
+            script = Path(summary["run_script"]).read_text()
+
+        self.assertNotIn("[csparc_input]", find_ini)
+        self.assertNotIn("[csparc_input]", filter_ini)
+        self.assertIn("run_local_vesicle_picker.py", script)
+        self.assertNotIn("find_vesicles.py", script)
+        self.assertNotIn("filter_vesicles.py", script)
+        self.assertLess(script.index("run_local_vesicle_picker.py"), script.index("visualize_vesicle_masks.py"))
+        self.assertLess(script.index("visualize_vesicle_masks.py"), script.index("filter_cryosparc_picks_by_vesicle_masks.py"))
+
 
 if __name__ == "__main__":
     unittest.main()

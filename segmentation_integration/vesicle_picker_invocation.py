@@ -49,6 +49,7 @@ def prepare_vesicle_picker_run(
     particles_csg: Path,
     micrographs_dir: Path,
     filter_output_dir: Path,
+    local_micrographs: bool = False,
 ) -> dict[str, str]:
     """Write Vesicle Picker configs and a runnable end-to-end shell script."""
     output_dir = Path(output_dir)
@@ -63,26 +64,40 @@ def prepare_vesicle_picker_run(
     filter_path = parameters_dir / "filter_vesicles.ini"
     script_path = output_dir / "run_end_to_end.sh"
 
-    find_path.write_text(
-        render_find_vesicles_ini(
-            csparc_login=csparc_login,
-            project_id=project_id,
-            job_id=job_id,
-            job_type=job_type,
-            model_weights_path=model_weights_path,
-            output_directory=found_masks_dir,
+    if local_micrographs:
+        find_path.write_text(
+            render_local_find_vesicles_ini(
+                model_weights_path=model_weights_path,
+                output_directory=found_masks_dir,
+            )
         )
-    )
-    filter_path.write_text(
-        render_filter_vesicles_ini(
-            csparc_login=csparc_login,
-            project_id=project_id,
-            job_id=job_id,
-            job_type=job_type,
-            input_directory=found_masks_dir,
-            output_directory=filtered_masks_dir,
+        filter_path.write_text(
+            render_local_filter_vesicles_ini(
+                input_directory=found_masks_dir,
+                output_directory=filtered_masks_dir,
+            )
         )
-    )
+    else:
+        find_path.write_text(
+            render_find_vesicles_ini(
+                csparc_login=csparc_login,
+                project_id=project_id,
+                job_id=job_id,
+                job_type=job_type,
+                model_weights_path=model_weights_path,
+                output_directory=found_masks_dir,
+            )
+        )
+        filter_path.write_text(
+            render_filter_vesicles_ini(
+                csparc_login=csparc_login,
+                project_id=project_id,
+                job_id=job_id,
+                job_type=job_type,
+                input_directory=found_masks_dir,
+                output_directory=filtered_masks_dir,
+            )
+        )
     script_path.write_text(
         render_end_to_end_script(
             vesicle_picker_dir=vesicle_picker_dir,
@@ -93,7 +108,8 @@ def prepare_vesicle_picker_run(
             micrographs_dir=micrographs_dir,
             vesicle_mask_dir=filtered_masks_dir,
             filter_output_dir=filter_output_dir,
-            workspace_id=workspace_id,
+            workspace_id=workspace_id or "local",
+            local_micrographs=local_micrographs,
         )
     )
     script_path.chmod(script_path.stat().st_mode | stat.S_IXUSR)
@@ -111,13 +127,14 @@ def prepare_vesicle_picker_run_for_dataset(
     *,
     dataset: str,
     output_dir: Path,
-    csparc_login: Path,
-    project_id: str,
-    workspace_id: str,
-    job_id: str,
-    job_type: str,
     model_weights_path: Path,
     filter_output_dir: Path,
+    csparc_login: Path | None = None,
+    project_id: str | None = None,
+    workspace_id: str | None = None,
+    job_id: str | None = None,
+    job_type: str = "curate",
+    local_micrographs: bool = False,
     particle_export_dir: Path | None = None,
     particles_cs: Path | None = None,
     particles_csg: Path | None = None,
@@ -136,16 +153,17 @@ def prepare_vesicle_picker_run_for_dataset(
     summary = prepare_vesicle_picker_run(
         output_dir=output_dir,
         vesicle_picker_dir=paths.vesicle_picker_dir,
-        csparc_login=csparc_login,
-        project_id=project_id,
-        workspace_id=workspace_id,
-        job_id=job_id,
+        csparc_login=csparc_login or Path("csparc_login.ini"),
+        project_id=project_id or "PXX",
+        workspace_id=workspace_id or "WXX",
+        job_id=job_id or "JXX",
         job_type=job_type,
         model_weights_path=model_weights_path,
         particles_cs=paths.particles_cs,
         particles_csg=paths.particles_csg,
         micrographs_dir=paths.micrographs_dir,
         filter_output_dir=filter_output_dir,
+        local_micrographs=local_micrographs,
     )
     summary.update(
         {
@@ -155,9 +173,71 @@ def prepare_vesicle_picker_run_for_dataset(
             "particle_export_dir": str(paths.preset.particle_export_dir),
             "micrographs_dir": str(paths.micrographs_dir),
             "vesicle_picker_dir": str(paths.vesicle_picker_dir),
+            "local_micrographs": str(local_micrographs),
         }
     )
     return summary
+
+
+def render_local_find_vesicles_ini(
+    *,
+    model_weights_path: Path,
+    output_directory: Path,
+) -> str:
+    return f"""[general]
+psize = {PRESTIN_SETTINGS["psize"]}
+downsample = {PRESTIN_SETTINGS["downsample"]}
+
+[preprocessing]
+lowpass_mode = {PRESTIN_SETTINGS["lowpass_mode"]}
+d = {PRESTIN_SETTINGS["d"]}
+sigmaColor = {PRESTIN_SETTINGS["sigmaColor"]}
+sigmaSpace = {PRESTIN_SETTINGS["sigmaSpace"]}
+
+[segmentation]
+model_weights_path = {model_weights_path}
+model_type = {PRESTIN_SETTINGS["model_type"]}
+device = {PRESTIN_SETTINGS["device"]}
+points_per_side = {PRESTIN_SETTINGS["points_per_side"]}
+points_per_batch = {PRESTIN_SETTINGS["points_per_batch"]}
+pred_iou_thresh = {PRESTIN_SETTINGS["pred_iou_thresh"]}
+stability_score_thresh = {PRESTIN_SETTINGS["stability_score_thresh"]}
+crop_n_layers = {PRESTIN_SETTINGS["crop_n_layers"]}
+crop_n_points_downscale_factor = {PRESTIN_SETTINGS["crop_n_points_downscale_factor"]}
+crop_nms_thresh = {PRESTIN_SETTINGS["crop_nms_thresh"]}
+min_mask_region_area = {PRESTIN_SETTINGS["min_mask_region_area"]}
+
+[postprocessing]
+functions = [postprocess.find_mask_intensity, postprocess.find_contour, postprocess.find_roundness, postprocess.fit_ellipse]
+
+[output]
+directory = {ensure_trailing_slash(output_directory)}
+"""
+
+
+def render_local_filter_vesicles_ini(
+    *,
+    input_directory: Path,
+    output_directory: Path,
+) -> str:
+    return f"""[input]
+directory = {ensure_trailing_slash(input_directory)}
+
+[general]
+psize = {PRESTIN_SETTINGS["psize"]}
+downsample = {PRESTIN_SETTINGS["downsample"]}
+
+[area]
+min = {PRESTIN_SETTINGS["area_min"]}
+max = {PRESTIN_SETTINGS["area_max"]}
+
+[roundness]
+min = {PRESTIN_SETTINGS["roundness_min"]}
+max = {PRESTIN_SETTINGS["roundness_max"]}
+
+[output]
+directory = {ensure_trailing_slash(output_directory)}
+"""
 
 
 def render_find_vesicles_ini(
@@ -252,6 +332,7 @@ def render_end_to_end_script(
     vesicle_mask_dir: Path,
     filter_output_dir: Path,
     workspace_id: str,
+    local_micrographs: bool = False,
 ) -> str:
     visualize_command = [
         "python",
@@ -290,6 +371,30 @@ def render_end_to_end_script(
         PRESTIN_SETTINGS["membrane_band_a"],
         "--skip-mask-pngs",
     ]
+    local_vesicle_command = [
+        "python",
+        "segmentation_integration/scripts/run_local_vesicle_picker.py",
+        "--vesicle-picker-dir",
+        vesicle_picker_dir,
+        "--particles-cs",
+        particles_cs,
+        "--micrographs-dir",
+        micrographs_dir,
+        "--find-parameters",
+        find_parameters,
+        "--filter-parameters",
+        filter_parameters,
+    ]
+    vesicle_picker_commands = (
+        quote_command(local_vesicle_command)
+        if local_micrographs
+        else "\n".join(
+            [
+                f"python \"$VESICLE_PICKER_DIR/find_vesicles.py\" {shlex.quote(str(find_parameters))}",
+                f"python \"$VESICLE_PICKER_DIR/filter_vesicles.py\" {shlex.quote(str(filter_parameters))}",
+            ]
+        )
+    )
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 
@@ -297,8 +402,7 @@ set -euo pipefail
 WID={shlex.quote(workspace_id)}
 VESICLE_PICKER_DIR={shlex.quote(str(vesicle_picker_dir))}
 
-python "$VESICLE_PICKER_DIR/find_vesicles.py" {shlex.quote(str(find_parameters))}
-python "$VESICLE_PICKER_DIR/filter_vesicles.py" {shlex.quote(str(filter_parameters))}
+{vesicle_picker_commands}
 
 {quote_command(visualize_command)}
 {quote_command(filter_command)}

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import configparser
 import json
 import sys
 from pathlib import Path
@@ -22,7 +23,7 @@ from segmentation_integration.cryosparc_io import (
     resolve_micrograph_path,
 )
 from segmentation_integration.vesicle_masks import load_vesicle_masks
-from segmentation_integration.visualization import render_mask_comparison_png, render_mask_overlay_comparison_png
+from segmentation_integration.visualization import render_mask_comparison_png, render_mask_filter_debug_png
 
 
 STATS_FIELDS = ("area", "roundness", "average_radius_A", "semi_minor_A", "semi_major_A")
@@ -38,6 +39,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--downsample", type=int, default=4)
     parser.add_argument("--display-downsample", type=int, default=4)
     parser.add_argument("--contrast-percentiles", default="1,99")
+    parser.add_argument("--filter-parameters", type=Path, help="Optional filter_vesicles.ini for found-mask reject reasons.")
     parser.add_argument("--max-micrographs", type=int, default=0, help="Maximum UIDs to render; 0 means all.")
     args = parser.parse_args()
     if (args.particles_cs is None) != (args.micrographs_dir is None):
@@ -56,12 +58,16 @@ def render_mask_filter_qc(
     downsample: int = 4,
     display_downsample: int = 4,
     contrast_percentiles: tuple[float, float] = (1, 99),
+    filter_parameters: Path | None = None,
 ) -> dict[str, int]:
     output_dir.mkdir(parents=True, exist_ok=True)
     uid_to_micrograph = micrograph_paths_by_uid(particles_cs, micrographs_dir) if particles_cs and micrographs_dir else {}
+    rules = load_filter_rules(filter_parameters) if filter_parameters else {}
     stats_rows = []
     rendered = 0
     missing_filtered = 0
+    found_kept = 0
+    found_rejected = 0
     for found_path in sorted(found_mask_dir.glob("*_vesicles.pkl")):
         if max_micrographs > 0 and rendered >= max_micrographs:
             break
@@ -71,27 +77,28 @@ def render_mask_filter_qc(
         filtered_masks = load_vesicle_masks(filtered_path) if filtered_path.exists() else []
         if not filtered_path.exists():
             missing_filtered += 1
-        stats_rows.extend(mask_stats_rows(uid, "found", found_masks))
+        classified = classify_masks(found_masks, rules)
+        found_kept += sum(1 for item in classified if not item["reject_reasons"])
+        found_rejected += sum(1 for item in classified if item["reject_reasons"])
+        stats_rows.extend(mask_stats_rows(uid, "found", found_masks, classified))
         stats_rows.extend(mask_stats_rows(uid, "filtered", filtered_masks))
         if not found_masks:
             continue
-        found_union = union_mask(found_masks)
-        filtered_union = union_mask(filtered_masks, shape=found_union.shape)
         micrograph_path = uid_to_micrograph.get(uid)
-        if micrograph_path is not None:
-            render_mask_overlay_comparison_png(
-                micrograph_path=micrograph_path,
-                output_path=output_dir / f"{uid}_found_vs_filtered_overlay.png",
-                found_mask=found_union,
-                filtered_mask=filtered_union,
-                downsample=downsample,
-                title=f"uid {uid} {micrograph_path.name}",
-                found_count=len(found_masks),
-                filtered_count=len(filtered_masks),
-                contrast_percentiles=contrast_percentiles,
-                display_downsample=display_downsample,
-            )
-        else:
+        render_mask_filter_debug_png(
+            micrograph_path=micrograph_path,
+            output_path=output_dir / f"{uid}_found_filter_debug.png",
+            found_kept_masks=[np.asarray(item["mask"]["segmentation"], dtype=bool) for item in classified if not item["reject_reasons"]],
+            found_rejected_masks=[np.asarray(item["mask"]["segmentation"], dtype=bool) for item in classified if item["reject_reasons"]],
+            filtered_masks=[np.asarray(mask["segmentation"], dtype=bool) for mask in filtered_masks],
+            downsample=downsample,
+            title=f"uid {uid}" + (f" {micrograph_path.name}" if micrograph_path is not None else ""),
+            contrast_percentiles=contrast_percentiles,
+            display_downsample=display_downsample,
+        )
+        if micrograph_path is None:
+            found_union = union_mask(found_masks)
+            filtered_union = union_mask(filtered_masks, shape=found_union.shape)
             render_mask_comparison_png(
                 output_path=output_dir / f"{uid}_found_vs_filtered_masks.png",
                 found_mask=found_union,
@@ -106,6 +113,8 @@ def render_mask_filter_qc(
         "rendered_comparisons": rendered,
         "missing_filtered_masks": missing_filtered,
         "stats_rows": len(stats_rows),
+        "found_masks_kept": found_kept,
+        "found_masks_rejected": found_rejected,
     }
 
 
@@ -136,10 +145,53 @@ def union_mask(masks: list[dict[str, Any]], shape: tuple[int, int] | None = None
     return out
 
 
-def mask_stats_rows(uid: int, stage: str, masks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def load_filter_rules(path: Path) -> dict[str, tuple[float | None, float | None]]:
+    config = configparser.ConfigParser()
+    config.read(path)
+    rules = {}
+    for section in config.sections():
+        if not config.has_option(section, "min") and not config.has_option(section, "max"):
+            continue
+        min_value = config.getfloat(section, "min", fallback=None)
+        max_value = config.getfloat(section, "max", fallback=None)
+        rules[section] = (min_value, max_value)
+    return rules
+
+
+def classify_masks(masks: list[dict[str, Any]], rules: dict[str, tuple[float | None, float | None]]) -> list[dict[str, Any]]:
+    classified = []
+    for mask in masks:
+        reject_reasons = []
+        for field, (min_value, max_value) in rules.items():
+            value = mask.get(field)
+            if value in (None, ""):
+                continue
+            value = float(value)
+            if min_value is not None and value < min_value:
+                reject_reasons.append(f"{field}_min")
+            if max_value is not None and value > max_value:
+                reject_reasons.append(f"{field}_max")
+        classified.append({"mask": mask, "reject_reasons": reject_reasons})
+    return classified
+
+
+def mask_stats_rows(
+    uid: int,
+    stage: str,
+    masks: list[dict[str, Any]],
+    classified: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
     rows = []
     for index, mask in enumerate(masks):
-        row = {"uid": uid, "stage": stage, "mask_index": index}
+        reject_reasons = classified[index]["reject_reasons"] if classified is not None else []
+        status = "rejected" if reject_reasons else "kept" if classified is not None else "output"
+        row = {
+            "uid": uid,
+            "stage": stage,
+            "mask_index": index,
+            "status": status,
+            "reject_reasons": ",".join(reject_reasons),
+        }
         for field in STATS_FIELDS:
             row[field] = mask.get(field, "")
         rows.append(row)
@@ -147,7 +199,7 @@ def mask_stats_rows(uid: int, stage: str, masks: list[dict[str, Any]]) -> list[d
 
 
 def write_stats_tsv(path: Path, rows: list[dict[str, Any]]) -> None:
-    fields = ("uid", "stage", "mask_index", *STATS_FIELDS)
+    fields = ("uid", "stage", "mask_index", "status", "reject_reasons", *STATS_FIELDS)
     with path.open("w") as handle:
         handle.write("\t".join(fields) + "\n")
         for row in rows:
@@ -167,6 +219,7 @@ def main() -> None:
         downsample=args.downsample,
         display_downsample=args.display_downsample,
         contrast_percentiles=contrast,
+        filter_parameters=args.filter_parameters,
     )
     print(json.dumps(summary, indent=2))
 

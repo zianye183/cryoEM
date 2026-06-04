@@ -25,15 +25,37 @@ def write_particles_cs(path: Path) -> None:
         np.save(handle, arr)
 
 
-def write_mask(path: Path, uid: int, area: int, roundness: float) -> None:
+def write_mask(path: Path, uid: int, area: int, roundness: float, offset: int = 2) -> None:
     segmentation = np.zeros((10, 10), dtype=bool)
-    segmentation[2:8, 2:8] = True
+    segmentation[offset : offset + 3, offset : offset + 3] = True
     composite = np.ones((10, 10), dtype=np.uint16)
     composite[segmentation] = 2
     with path.open("wb") as handle:
         pickle.dump(
             {
                 "masks": [{"prime_key": 2, "area": area, "roundness": roundness}],
+                "composite_mask": composite,
+                "uid": uid,
+            },
+            handle,
+        )
+
+
+def write_two_mask_pickle(path: Path, uid: int) -> None:
+    first = np.zeros((10, 10), dtype=bool)
+    first[1:4, 1:4] = True
+    second = np.zeros((10, 10), dtype=bool)
+    second[5:9, 5:9] = True
+    composite = np.ones((10, 10), dtype=np.uint16)
+    composite[first] *= 2
+    composite[second] *= 3
+    with path.open("wb") as handle:
+        pickle.dump(
+            {
+                "masks": [
+                    {"prime_key": 2, "area": 9, "roundness": 0.9},
+                    {"prime_key": 3, "area": 16, "roundness": 0.9},
+                ],
                 "composite_mask": composite,
                 "uid": uid,
             },
@@ -68,13 +90,44 @@ class UpstreamMaskQcTests(unittest.TestCase):
             )
 
             stats = (output_dir / "mask_filter_stats.tsv").read_text()
-            comparison_size = (output_dir / "7_found_vs_filtered_overlay.png").stat().st_size
+            comparison_size = (output_dir / "7_found_filter_debug.png").stat().st_size
 
         self.assertEqual(summary["rendered_comparisons"], 1)
         self.assertGreater(comparison_size, 0)
-        self.assertIn("uid\tstage\tmask_index\tarea\troundness", stats)
-        self.assertIn("7\tfound\t0\t36\t0.5", stats)
-        self.assertIn("7\tfiltered\t0\t36\t0.5", stats)
+        self.assertIn("uid\tstage\tmask_index\tstatus\treject_reasons\tarea\troundness", stats)
+        self.assertIn("7\tfound\t0\tkept\t\t36\t0.5", stats)
+        self.assertIn("7\tfiltered\t0\toutput\t\t36\t0.5", stats)
+
+    def test_render_mask_filter_qc_classifies_found_masks_with_reject_reasons(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            found_dir = root / "found"
+            filtered_dir = root / "filtered"
+            output_dir = root / "qc"
+            found_dir.mkdir()
+            filtered_dir.mkdir()
+            filter_ini = root / "filter_vesicles.ini"
+            filter_ini.write_text("[area]\nmin = 10\nmax = 20\n\n[roundness]\nmin = 0.75\nmax = 1\n")
+            write_two_mask_pickle(found_dir / "7_vesicles.pkl", uid=7)
+            write_mask(filtered_dir / "7_vesicles_filtered.pkl", uid=7, area=16, roundness=0.9, offset=5)
+
+            summary = render_mask_filter_qc(
+                found_mask_dir=found_dir,
+                filtered_mask_dir=filtered_dir,
+                output_dir=output_dir,
+                max_micrographs=0,
+                filter_parameters=filter_ini,
+            )
+
+            stats = (output_dir / "mask_filter_stats.tsv").read_text()
+            debug_size = (output_dir / "7_found_filter_debug.png").stat().st_size
+
+        self.assertEqual(summary["found_masks_kept"], 1)
+        self.assertEqual(summary["found_masks_rejected"], 1)
+        self.assertGreater(debug_size, 0)
+        self.assertIn("uid\tstage\tmask_index\tstatus\treject_reasons", stats)
+        self.assertIn("7\tfound\t0\trejected\tarea_min", stats)
+        self.assertIn("7\tfound\t1\tkept\t", stats)
 
 
 if __name__ == "__main__":

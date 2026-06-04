@@ -14,6 +14,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from scipy import ndimage
 
 
 def render_overlay(
@@ -151,6 +152,109 @@ def render_mask_overlay_comparison_png(
     fig.tight_layout(pad=0.6)
     fig.savefig(output_path, dpi=dpi)
     plt.close(fig)
+
+
+def render_mask_filter_debug_png(
+    *,
+    output_path: Path,
+    found_kept_masks: list[np.ndarray],
+    found_rejected_masks: list[np.ndarray],
+    filtered_masks: list[np.ndarray],
+    title: str,
+    micrograph_path: Path | None = None,
+    downsample: int = 4,
+    contrast_percentiles: tuple[float, float] = (1, 99),
+    display_downsample: int = 4,
+    dpi: int = 180,
+) -> None:
+    """Render useful upstream QC: contour-only found kept/rejected and filtered masks."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    if micrograph_path is not None:
+        image = read_mode2_mrc(micrograph_path)
+        finite = image[np.isfinite(image)]
+        if finite.size == 0:
+            raise ValueError(f"Micrograph has no finite pixels: {micrograph_path}")
+        vmin, vmax = np.percentile(finite, contrast_percentiles)
+        display = image[::display_downsample, ::display_downsample]
+    else:
+        image = None
+        display = None
+        vmin = vmax = None
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+    for ax, label in zip(axes, ("found: kept green, rejected red", "filtered output")):
+        if display is not None:
+            ax.imshow(display, cmap="gray", origin="upper", vmin=vmin, vmax=vmax)
+        else:
+            shape = _first_mask_shape(found_kept_masks, found_rejected_masks, filtered_masks)
+            ax.imshow(np.zeros(shape, dtype=np.uint8), cmap="gray", vmin=0, vmax=1, origin="upper")
+        ax.set_title(label)
+        ax.set_axis_off()
+
+    _imshow_mask_contours(
+        axes[0],
+        found_rejected_masks,
+        color=(1.0, 0.0, 0.0, 0.95),
+        downsample=downsample,
+        display_downsample=display_downsample,
+        image_shape=image.shape if image is not None else None,
+    )
+    _imshow_mask_contours(
+        axes[0],
+        found_kept_masks,
+        color=(0.0, 1.0, 0.0, 0.95),
+        downsample=downsample,
+        display_downsample=display_downsample,
+        image_shape=image.shape if image is not None else None,
+    )
+    _imshow_mask_contours(
+        axes[1],
+        filtered_masks,
+        color=(0.0, 0.85, 1.0, 0.95),
+        downsample=downsample,
+        display_downsample=display_downsample,
+        image_shape=image.shape if image is not None else None,
+    )
+    fig.suptitle(title)
+    fig.tight_layout(pad=0.6)
+    fig.savefig(output_path, dpi=dpi)
+    plt.close(fig)
+
+
+def _first_mask_shape(*mask_groups: list[np.ndarray]) -> tuple[int, int]:
+    for group in mask_groups:
+        for mask in group:
+            return np.asarray(mask).shape
+    return (1, 1)
+
+
+def _imshow_mask_contours(
+    ax,
+    masks: list[np.ndarray],
+    *,
+    color: tuple[float, float, float, float],
+    downsample: int,
+    display_downsample: int,
+    image_shape: tuple[int, int] | None,
+) -> None:
+    if not masks:
+        return
+    union = np.zeros(np.asarray(masks[0], dtype=bool).shape, dtype=bool)
+    for mask in masks:
+        segmentation = np.asarray(mask, dtype=bool)
+        if not segmentation.any():
+            continue
+        edge = segmentation & ~ndimage.binary_erosion(segmentation)
+        edge = ndimage.binary_dilation(edge, iterations=1)
+        union |= edge
+    if image_shape is not None:
+        union = np.repeat(np.repeat(union, downsample, axis=0), downsample, axis=1)
+        union = union[: image_shape[0], : image_shape[1]]
+    effective_display_downsample = display_downsample if image_shape is not None else 1
+    shown = union[::effective_display_downsample, ::effective_display_downsample]
+    rgba = np.zeros((*shown.shape, 4), dtype=float)
+    rgba[shown] = color
+    ax.imshow(rgba, interpolation="nearest", origin="upper")
 
 
 def _scatter(

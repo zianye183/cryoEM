@@ -12,23 +12,40 @@ The filter expects CryoSPARC-style mask filenames:
 
 ## End-to-end readout
 
+For the standard Prestin subset runs, use one dataset preset:
+
+```text
+raw   -> particles: /nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/exports/groups/J71_particles
+         micrographs: /nfs/bartesaghilab2/zy223/denoising/data/fuller_subset
+draco -> particles: /nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/exports/groups/J70_particles
+         micrographs: /nfs/bartesaghilab2/zy223/denoising/results/draco_pretrained_fuller_subset
+```
+
+The Vesicle Picker checkout is recorded as:
+
+```text
+/nfs/bartesaghilab2/mm1229/segmentation_code/vesicle-picker
+```
+
 First prepare Vesicle Picker parameter files and a runnable shell script:
 
 ```bash
 python segmentation_integration/scripts/prepare_vesicle_picker_run.py \
+  --dataset raw \
   --output-dir /path/to/segmentation_run \
-  --vesicle-picker-dir /path/to/vesicle-picker \
   --csparc-login /path/to/csparc_login.ini \
   --project-id PXX \
   --workspace-id WXX \
   --job-id JXX \
   --job-type curate \
   --model-weights-path /path/to/sam_vit_l_0b3195.pth \
-  --particles-cs /path/to/particles.cs \
-  --particles-csg /path/to/particles.csg \
-  --micrographs-dir /path/to/micrographs \
   --filter-output-dir /path/to/segmentation_run/filtered_particles
 ```
+
+Use `--dataset draco` for the Draco-denoised micrographs. The preset locates
+the one `.cs` and one `.csg` file in the corresponding CryoSPARC exported
+particle result-group directory. The explicit path flags still exist as
+overrides for nonstandard runs.
 
 This writes:
 
@@ -58,10 +75,8 @@ If Vesicle Picker masks already exist, run:
 
 ```bash
 python segmentation_integration/scripts/filter_cryosparc_picks_by_vesicle_masks.py \
-  --particles-cs /path/to/particles.cs \
-  --particles-csg /path/to/particles.csg \
+  --dataset raw \
   --vesicle-mask-dir /path/to/filter_vesicles_outputs \
-  --micrographs-dir /path/to/micrographs \
   --output-dir /path/to/filter_output \
   --psize-a 1.068 \
   --downsample 4 \

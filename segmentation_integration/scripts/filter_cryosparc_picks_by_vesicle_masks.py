@@ -21,6 +21,7 @@ from segmentation_integration.cryosparc_io import (
     resolve_micrograph_path,
     write_cs,
 )
+from segmentation_integration.dataset_presets import dataset_choices, resolve_standard_paths
 from segmentation_integration.filtering import filter_particles_by_masks, particle_fullres_xy
 from segmentation_integration.reporting import write_summary_json, write_tsv
 from segmentation_integration.visualization import render_mask_png, render_overlay
@@ -28,10 +29,12 @@ from segmentation_integration.visualization import render_mask_png, render_overl
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--particles-cs", type=Path, required=True)
-    parser.add_argument("--particles-csg", type=Path, required=True)
+    parser.add_argument("--dataset", choices=dataset_choices(), help="Use standard Prestin paths for raw or draco.")
+    parser.add_argument("--particle-export-dir", type=Path, help="Override the preset particle export directory.")
+    parser.add_argument("--particles-cs", type=Path, help="Override the preset particle .cs file.")
+    parser.add_argument("--particles-csg", type=Path, help="Override the preset particle .csg file.")
     parser.add_argument("--vesicle-mask-dir", type=Path, required=True)
-    parser.add_argument("--micrographs-dir", type=Path, required=True)
+    parser.add_argument("--micrographs-dir", type=Path, help="Override the preset micrograph directory.")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--psize-a", type=float, default=1.068)
     parser.add_argument("--downsample", type=int, default=4)
@@ -45,7 +48,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Do not render standalone membrane-band mask PNGs during filtering.",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.dataset is None:
+        missing = [name for name in ("particles_cs", "particles_csg", "micrographs_dir") if getattr(args, name) is None]
+        if missing:
+            parser.error("--dataset is required unless --particles-cs, --particles-csg, and --micrographs-dir are all provided")
+    return args
 
 
 def parse_percentiles(text: str) -> tuple[float, float]:
@@ -57,6 +65,17 @@ def parse_percentiles(text: str) -> tuple[float, float]:
 
 def main() -> None:
     args = parse_args()
+    if args.dataset is not None:
+        paths = resolve_standard_paths(
+            args.dataset,
+            particle_export_dir=args.particle_export_dir,
+            particles_cs=args.particles_cs,
+            particles_csg=args.particles_csg,
+            micrographs_dir=args.micrographs_dir,
+        )
+        args.particles_cs = paths.particles_cs
+        args.particles_csg = paths.particles_csg
+        args.micrographs_dir = paths.micrographs_dir
     low_high = parse_percentiles(args.contrast_percentiles)
     particles = load_particles_cs(args.particles_cs)
     result = filter_particles_by_masks(

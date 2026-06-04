@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from segmentation_integration.cryosparc_io import decode_path, load_particles_cs
+from segmentation_integration.dataset_presets import dataset_choices, resolve_particle_cs_path
 from segmentation_integration.vesicle_masks import (
     build_membrane_band,
     load_vesicle_masks,
@@ -24,7 +25,9 @@ from segmentation_integration.visualization import render_mask_png
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--particles-cs", type=Path, required=True)
+    parser.add_argument("--dataset", choices=dataset_choices(), help="Use standard Prestin paths for raw or draco.")
+    parser.add_argument("--particle-export-dir", type=Path, help="Override the preset particle export directory.")
+    parser.add_argument("--particles-cs", type=Path, help="Override the preset particle .cs file.")
     parser.add_argument("--vesicle-mask-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--psize-a", type=float, default=1.068)
@@ -36,7 +39,10 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help="Maximum mask previews to render; 0 means all micrographs with masks.",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.dataset is None and args.particles_cs is None:
+        parser.error("--dataset is required unless --particles-cs is provided")
+    return args
 
 
 def render_mask_previews(
@@ -85,8 +91,15 @@ def render_mask_previews(
 
 def main() -> None:
     args = parse_args()
+    particles_cs = args.particles_cs
+    if args.dataset is not None:
+        particles_cs = resolve_particle_cs_path(
+            args.dataset,
+            particle_export_dir=args.particle_export_dir,
+            particles_cs=args.particles_cs,
+        )
     summary = render_mask_previews(
-        particles_cs=args.particles_cs,
+        particles_cs=particles_cs,
         vesicle_mask_dir=args.vesicle_mask_dir,
         output_dir=args.output_dir,
         psize_a=args.psize_a,

@@ -7,6 +7,8 @@ import shlex
 import stat
 from pathlib import Path
 
+from segmentation_integration.dataset_presets import resolve_standard_paths
+
 
 PRESTIN_SETTINGS = {
     "psize": "1.068",
@@ -103,6 +105,59 @@ def prepare_vesicle_picker_run(
         "filtered_masks_dir": str(filtered_masks_dir),
         "filter_output_dir": str(filter_output_dir),
     }
+
+
+def prepare_vesicle_picker_run_for_dataset(
+    *,
+    dataset: str,
+    output_dir: Path,
+    csparc_login: Path,
+    project_id: str,
+    workspace_id: str,
+    job_id: str,
+    job_type: str,
+    model_weights_path: Path,
+    filter_output_dir: Path,
+    particle_export_dir: Path | None = None,
+    particles_cs: Path | None = None,
+    particles_csg: Path | None = None,
+    micrographs_dir: Path | None = None,
+    vesicle_picker_dir: Path | None = None,
+) -> dict[str, str]:
+    """Write Vesicle Picker configs using a named Prestin dataset preset."""
+    paths = resolve_standard_paths(
+        dataset,
+        particle_export_dir=particle_export_dir,
+        particles_cs=particles_cs,
+        particles_csg=particles_csg,
+        micrographs_dir=micrographs_dir,
+        vesicle_picker_dir=vesicle_picker_dir,
+    )
+    summary = prepare_vesicle_picker_run(
+        output_dir=output_dir,
+        vesicle_picker_dir=paths.vesicle_picker_dir,
+        csparc_login=csparc_login,
+        project_id=project_id,
+        workspace_id=workspace_id,
+        job_id=job_id,
+        job_type=job_type,
+        model_weights_path=model_weights_path,
+        particles_cs=paths.particles_cs,
+        particles_csg=paths.particles_csg,
+        micrographs_dir=paths.micrographs_dir,
+        filter_output_dir=filter_output_dir,
+    )
+    summary.update(
+        {
+            "dataset": dataset,
+            "particles_cs": str(paths.particles_cs),
+            "particles_csg": str(paths.particles_csg),
+            "particle_export_dir": str(paths.preset.particle_export_dir),
+            "micrographs_dir": str(paths.micrographs_dir),
+            "vesicle_picker_dir": str(paths.vesicle_picker_dir),
+        }
+    )
+    return summary
 
 
 def render_find_vesicles_ini(

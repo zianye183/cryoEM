@@ -4,12 +4,14 @@ from pathlib import Path
 import subprocess
 import sys
 from io import StringIO
+from copy import deepcopy
 
 import numpy as np
 
 from segmentation_integration.scripts.run_local_vesicle_picker import (
     MicrographRecord,
     emit_progress,
+    export_masks_to_disk_without_mutating,
     micrograph_records_from_particles,
 )
 
@@ -63,6 +65,27 @@ class LocalVesiclePickerTests(unittest.TestCase):
             stream.getvalue().strip(),
             "[local vesicle picker] 2/5 uid=17 status=done found=4 filtered=3 mic=mic.mrc",
         )
+
+    def test_export_masks_to_disk_without_mutating_keeps_segmentation_for_filtering(self) -> None:
+        masks = [{"segmentation": np.ones((2, 2), dtype=bool), "area": 4}]
+        exported = []
+
+        def fake_export(export_masks, filename, micrograph_uid, compression):
+            exported.append((filename, micrograph_uid, compression))
+            for mask in export_masks:
+                mask.pop("segmentation", None)
+
+        export_masks_to_disk_without_mutating(
+            fake_export,
+            masks,
+            "out.pkl",
+            micrograph_uid=7,
+            compression="uint64",
+        )
+
+        self.assertIn("segmentation", masks[0])
+        self.assertEqual(exported, [("out.pkl", 7, "uint64")])
+        self.assertEqual(deepcopy(masks)[0]["area"], 4)
 
 
 if __name__ == "__main__":

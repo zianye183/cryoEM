@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import sys
 from dataclasses import dataclass
@@ -161,7 +162,8 @@ def run_local_vesicle_picker(
                 mask["semi_major_A"] = mask["semi_major"] * psize * downsample
 
         found_path = found_dir / f"{record.uid}_vesicles.pkl"
-        external_export.export_masks_to_disk(
+        export_masks_to_disk_without_mutating(
+            external_export.export_masks_to_disk,
             postprocessed_masks,
             str(found_path),
             micrograph_uid=record.uid,
@@ -184,7 +186,8 @@ def run_local_vesicle_picker(
                 )
             continue
         filtered_path = filtered_dir / f"{record.uid}_vesicles_filtered.pkl"
-        external_export.export_masks_to_disk(
+        export_masks_to_disk_without_mutating(
+            external_export.export_masks_to_disk,
             filtered_masks,
             str(filtered_path),
             micrograph_uid=record.uid,
@@ -209,6 +212,16 @@ def run_local_vesicle_picker(
         "filtered_mask_files": filtered_written,
         "empty_micrographs": skipped_empty,
     }
+
+
+def export_masks_to_disk_without_mutating(export_fn, masks, filename, *, micrograph_uid, compression) -> None:
+    """Call Vesicle Picker export on a deep copy because it removes segmentation keys."""
+    export_fn(
+        copy.deepcopy(masks),
+        filename,
+        micrograph_uid=micrograph_uid,
+        compression=compression,
+    )
 
 
 def should_emit_progress(index: int, progress_every: int) -> bool:

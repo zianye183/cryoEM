@@ -21,7 +21,7 @@ from segmentation_integration.cryosparc_io import (
     load_particles_cs,
     resolve_micrograph_path,
 )
-from segmentation_integration.mrc_io import read_mode2_mrc
+from segmentation_integration.mrc_io import read_mrc
 
 
 @dataclass(frozen=True)
@@ -102,7 +102,7 @@ def run_local_vesicle_picker(
     for index, record in enumerate(records, start=1):
         if should_emit_progress(index, progress_every):
             emit_progress(progress_stream, index=index, total=total, record=record, status="start")
-        image_fullres = read_mode2_mrc(record.path)
+        image_fullres = read_mrc(record.path)
         preprocessed_micrograph = preprocess.preprocess_micrograph(
             image_fullres,
             downsample=find_config.getint("general", "downsample"),

@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from segmentation_integration.vesicle_picker_invocation import (
+    DEFAULT_MODEL_WEIGHTS_PATH,
     prepare_vesicle_picker_run,
     prepare_vesicle_picker_run_for_dataset,
 )
@@ -90,7 +91,6 @@ class VesiclePickerInvocationTests(unittest.TestCase):
                 output_dir=root / "run",
                 particle_export_dir=particle_export_dir,
                 local_micrographs=True,
-                model_weights_path=Path("/cluster/sam_vit_l_0b3195.pth"),
                 filter_output_dir=root / "filtered",
             )
 
@@ -101,6 +101,7 @@ class VesiclePickerInvocationTests(unittest.TestCase):
         self.assertNotIn("[csparc_input]", find_ini)
         self.assertNotIn("[csparc_input]", filter_ini)
         self.assertIn("run_local_vesicle_picker.py", script)
+        self.assertIn(f"model_weights_path = {DEFAULT_MODEL_WEIGHTS_PATH}", find_ini)
         self.assertNotIn("find_vesicles.py", script)
         self.assertNotIn("filter_vesicles.py", script)
         self.assertLess(script.index("run_local_vesicle_picker.py"), script.index("visualize_vesicle_masks.py"))

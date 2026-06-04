@@ -34,7 +34,6 @@ python segmentation_integration/scripts/prepare_vesicle_picker_run.py \
   --dataset raw \
   --local-micrographs \
   --output-dir /path/to/segmentation_run \
-  --model-weights-path /path/to/sam_vit_l_0b3195.pth \
   --filter-output-dir /path/to/segmentation_run/filtered_particles
 ```
 
@@ -48,6 +47,12 @@ instead of asking Vesicle Picker to pull micrographs from a CryoSPARC job, so
 `--csparc-login`, `--project-id`, `--workspace-id`, and `--job-id` are not
 needed. Omit `--local-micrographs` only when you want stock Vesicle Picker
 CryoSPARC import behavior.
+
+Default SAM weights:
+
+```text
+/nfs/bartesaghilab2/mm1229/segmentation_code/vesicle-picker/sam_vit_l_0b3195.pth
+```
 
 This writes:
 

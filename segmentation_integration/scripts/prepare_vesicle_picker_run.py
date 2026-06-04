@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
 
 from segmentation_integration.dataset_presets import dataset_choices
 from segmentation_integration.vesicle_picker_invocation import (
+    DEFAULT_MODEL_WEIGHTS_PATH,
     prepare_vesicle_picker_run,
     prepare_vesicle_picker_run_for_dataset,
 )
@@ -34,7 +35,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--workspace-id")
     parser.add_argument("--job-id")
     parser.add_argument("--job-type", choices=["curate", "patch_ctf"], default="curate")
-    parser.add_argument("--model-weights-path", type=Path, required=True)
+    parser.add_argument("--model-weights-path", type=Path, default=DEFAULT_MODEL_WEIGHTS_PATH)
     parser.add_argument("--particle-export-dir", type=Path, help="Override the preset particle export directory.")
     parser.add_argument("--particles-cs", type=Path, help="Override the preset particle .cs file.")
     parser.add_argument("--particles-csg", type=Path, help="Override the preset particle .csg file.")

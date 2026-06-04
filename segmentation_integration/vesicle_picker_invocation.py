@@ -10,6 +10,9 @@ from pathlib import Path
 from segmentation_integration.dataset_presets import resolve_standard_paths
 
 
+DEFAULT_MODEL_WEIGHTS_PATH = Path("/nfs/bartesaghilab2/mm1229/segmentation_code/vesicle-picker/sam_vit_l_0b3195.pth")
+
+
 PRESTIN_SETTINGS = {
     "psize": "1.068",
     "downsample": "4",
@@ -44,7 +47,7 @@ def prepare_vesicle_picker_run(
     workspace_id: str,
     job_id: str,
     job_type: str,
-    model_weights_path: Path,
+    model_weights_path: Path = DEFAULT_MODEL_WEIGHTS_PATH,
     particles_cs: Path,
     particles_csg: Path,
     micrographs_dir: Path,
@@ -127,7 +130,7 @@ def prepare_vesicle_picker_run_for_dataset(
     *,
     dataset: str,
     output_dir: Path,
-    model_weights_path: Path,
+    model_weights_path: Path = DEFAULT_MODEL_WEIGHTS_PATH,
     filter_output_dir: Path,
     csparc_login: Path | None = None,
     project_id: str | None = None,

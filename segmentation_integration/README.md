@@ -51,7 +51,7 @@ CryoSPARC import behavior.
 Default SAM weights:
 
 ```text
-/nfs/bartesaghilab2/mm1229/segmentation_code/vesicle-picker/sam_vit_l_0b3195.pth
+/nfs/bartesaghilab2/mm1229/segmentation_code/vesicle-picker/sam_vit_h_4b8939.pth
 ```
 
 This writes:

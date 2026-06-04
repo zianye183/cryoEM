@@ -10,7 +10,7 @@ from pathlib import Path
 from segmentation_integration.dataset_presets import resolve_standard_paths
 
 
-DEFAULT_MODEL_WEIGHTS_PATH = Path("/nfs/bartesaghilab2/mm1229/segmentation_code/vesicle-picker/sam_vit_l_0b3195.pth")
+DEFAULT_MODEL_WEIGHTS_PATH = Path("/nfs/bartesaghilab2/mm1229/segmentation_code/vesicle-picker/sam_vit_h_4b8939.pth")
 
 
 PRESTIN_SETTINGS = {
@@ -20,7 +20,7 @@ PRESTIN_SETTINGS = {
     "d": "17",
     "sigmaColor": "71",
     "sigmaSpace": "71",
-    "model_type": "vit_l",
+    "model_type": "vit_h",
     "device": "cuda:0",
     "points_per_side": "36",
     "points_per_batch": "16",

@@ -10,6 +10,7 @@ from segmentation_integration.cryosparc_io import (
     decode_path,
     load_particles_cs,
     patch_csg_cs_path,
+    resolve_micrograph_path,
     write_cs,
 )
 
@@ -85,6 +86,21 @@ class CryosparcIoTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "Ambiguous"):
                 patch_csg_cs_path(csg, root / "filtered.csg", "particles.cs", root / "filtered_particles.cs")
+
+    def test_resolve_micrograph_path_matches_local_file_after_numeric_export_prefix(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            local_name = "FoilHole_6367920_Data_5347108_17_20260207_032343_fractions.mrc"
+            local_path = root / local_name
+            local_path.write_bytes(b"")
+
+            resolved = resolve_micrograph_path(
+                ">J26/imported/003884161951494007383_" + local_name,
+                root,
+                {local_path.stem: local_path},
+            )
+
+        self.assertEqual(resolved, local_path)
 
 
 if __name__ == "__main__":

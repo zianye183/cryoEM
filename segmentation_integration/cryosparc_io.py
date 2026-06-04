@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,7 @@ REQUIRED_LOCATION_FIELDS = {
 }
 
 IMAGE_EXTENSIONS = {".mrc", ".mrcs", ".tif", ".tiff"}
+CRYOSPARC_EXPORT_PREFIX_RE = re.compile(r"^\d+_(.+)$")
 
 
 def decode_path(value: Any) -> str:
@@ -85,9 +87,20 @@ def resolve_micrograph_path(
     indexed = micrograph_index.get(raw.stem)
     if indexed is not None:
         return indexed
+    normalized_stem = strip_numeric_export_prefix(raw.stem)
+    if normalized_stem != raw.stem:
+        indexed = micrograph_index.get(normalized_stem)
+        if indexed is not None:
+            return indexed
     raise FileNotFoundError(
         f"Could not resolve micrograph {cryosparc_micrograph_path!r} under {micrographs_dir}"
     )
+
+
+def strip_numeric_export_prefix(stem: str) -> str:
+    """Drop CryoSPARC export prefixes like 003884..._ before FoilHole names."""
+    match = CRYOSPARC_EXPORT_PREFIX_RE.match(stem.lstrip(">"))
+    return match.group(1) if match else stem.lstrip(">")
 
 
 def patch_csg_cs_path(
@@ -127,4 +140,3 @@ def _replace_cs_reference(value: Any, original_cs_name: str, new_cs_path: str) -
     if isinstance(value, str) and Path(value).name == original_cs_name:
         return new_cs_path, 1
     return copy.deepcopy(value), 0
-

@@ -15,8 +15,14 @@ if str(ROOT) not in sys.path:
 
 import numpy as np
 
+from segmentation_integration.cryosparc_io import (
+    build_micrograph_index,
+    decode_path,
+    load_particles_cs,
+    resolve_micrograph_path,
+)
 from segmentation_integration.vesicle_masks import load_vesicle_masks
-from segmentation_integration.visualization import render_mask_comparison_png
+from segmentation_integration.visualization import render_mask_comparison_png, render_mask_overlay_comparison_png
 
 
 STATS_FIELDS = ("area", "roundness", "average_radius_A", "semi_minor_A", "semi_major_A")
@@ -27,8 +33,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--found-mask-dir", type=Path, required=True)
     parser.add_argument("--filtered-mask-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--particles-cs", type=Path, help="Optional particle .cs for resolving micrograph underlays.")
+    parser.add_argument("--micrographs-dir", type=Path, help="Optional micrograph directory for overlay renderings.")
+    parser.add_argument("--downsample", type=int, default=4)
+    parser.add_argument("--display-downsample", type=int, default=4)
+    parser.add_argument("--contrast-percentiles", default="1,99")
     parser.add_argument("--max-micrographs", type=int, default=0, help="Maximum UIDs to render; 0 means all.")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if (args.particles_cs is None) != (args.micrographs_dir is None):
+        parser.error("--particles-cs and --micrographs-dir must be provided together")
+    return args
 
 
 def render_mask_filter_qc(
@@ -37,8 +51,14 @@ def render_mask_filter_qc(
     filtered_mask_dir: Path,
     output_dir: Path,
     max_micrographs: int,
+    particles_cs: Path | None = None,
+    micrographs_dir: Path | None = None,
+    downsample: int = 4,
+    display_downsample: int = 4,
+    contrast_percentiles: tuple[float, float] = (1, 99),
 ) -> dict[str, int]:
     output_dir.mkdir(parents=True, exist_ok=True)
+    uid_to_micrograph = micrograph_paths_by_uid(particles_cs, micrographs_dir) if particles_cs and micrographs_dir else {}
     stats_rows = []
     rendered = 0
     missing_filtered = 0
@@ -57,14 +77,29 @@ def render_mask_filter_qc(
             continue
         found_union = union_mask(found_masks)
         filtered_union = union_mask(filtered_masks, shape=found_union.shape)
-        render_mask_comparison_png(
-            output_path=output_dir / f"{uid}_found_vs_filtered_masks.png",
-            found_mask=found_union,
-            filtered_mask=filtered_union,
-            title=f"uid {uid}",
-            found_count=len(found_masks),
-            filtered_count=len(filtered_masks),
-        )
+        micrograph_path = uid_to_micrograph.get(uid)
+        if micrograph_path is not None:
+            render_mask_overlay_comparison_png(
+                micrograph_path=micrograph_path,
+                output_path=output_dir / f"{uid}_found_vs_filtered_overlay.png",
+                found_mask=found_union,
+                filtered_mask=filtered_union,
+                downsample=downsample,
+                title=f"uid {uid} {micrograph_path.name}",
+                found_count=len(found_masks),
+                filtered_count=len(filtered_masks),
+                contrast_percentiles=contrast_percentiles,
+                display_downsample=display_downsample,
+            )
+        else:
+            render_mask_comparison_png(
+                output_path=output_dir / f"{uid}_found_vs_filtered_masks.png",
+                found_mask=found_union,
+                filtered_mask=filtered_union,
+                title=f"uid {uid}",
+                found_count=len(found_masks),
+                filtered_count=len(filtered_masks),
+            )
         rendered += 1
     write_stats_tsv(output_dir / "mask_filter_stats.tsv", stats_rows)
     return {
@@ -76,6 +111,18 @@ def render_mask_filter_qc(
 
 def uid_from_found_mask_path(path: Path) -> int:
     return int(path.name.removesuffix("_vesicles.pkl"))
+
+
+def micrograph_paths_by_uid(particles_cs: Path, micrographs_dir: Path) -> dict[int, Path]:
+    particles = load_particles_cs(particles_cs)
+    index = build_micrograph_index(micrographs_dir)
+    out: dict[int, Path] = {}
+    for particle in particles:
+        uid = int(particle["location/micrograph_uid"])
+        if uid in out:
+            continue
+        out[uid] = resolve_micrograph_path(decode_path(particle["location/micrograph_path"]), micrographs_dir, index)
+    return out
 
 
 def union_mask(masks: list[dict[str, Any]], shape: tuple[int, int] | None = None) -> np.ndarray:
@@ -109,13 +156,26 @@ def write_stats_tsv(path: Path, rows: list[dict[str, Any]]) -> None:
 
 def main() -> None:
     args = parse_args()
+    contrast = parse_percentiles(args.contrast_percentiles)
     summary = render_mask_filter_qc(
         found_mask_dir=args.found_mask_dir,
         filtered_mask_dir=args.filtered_mask_dir,
         output_dir=args.output_dir,
         max_micrographs=args.max_micrographs,
+        particles_cs=args.particles_cs,
+        micrographs_dir=args.micrographs_dir,
+        downsample=args.downsample,
+        display_downsample=args.display_downsample,
+        contrast_percentiles=contrast,
     )
     print(json.dumps(summary, indent=2))
+
+
+def parse_percentiles(text: str) -> tuple[float, float]:
+    parts = [float(part.strip()) for part in text.split(",")]
+    if len(parts) != 2 or parts[0] >= parts[1]:
+        raise argparse.ArgumentTypeError("Expected low,high percentiles such as 1,99")
+    return parts[0], parts[1]
 
 
 if __name__ == "__main__":

@@ -83,8 +83,14 @@ To render upstream QC from existing Vesicle Picker outputs:
 python segmentation_integration/scripts/visualize_vesicle_mask_filtering.py \
   --found-mask-dir /path/to/vesicle_masks_found \
   --filtered-mask-dir /path/to/vesicle_masks_filtered \
-  --output-dir /path/to/filter_output/mask_filter_qc
+  --output-dir /path/to/filter_output/mask_filter_qc \
+  --particles-cs /path/to/particles.cs \
+  --micrographs-dir /path/to/micrographs
 ```
+
+When `--particles-cs` and `--micrographs-dir` are provided, the QC images overlay
+found and filtered masks on the micrograph underlay. Without those inputs, the
+script falls back to binary mask-only panels.
 
 ## Filter-only command
 

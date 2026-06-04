@@ -107,6 +107,52 @@ def render_mask_comparison_png(
     plt.close(fig)
 
 
+def render_mask_overlay_comparison_png(
+    *,
+    micrograph_path: Path,
+    output_path: Path,
+    found_mask: np.ndarray,
+    filtered_mask: np.ndarray,
+    downsample: int,
+    title: str,
+    found_count: int,
+    filtered_count: int,
+    contrast_percentiles: tuple[float, float] = (1, 99),
+    display_downsample: int = 4,
+    dpi: int = 180,
+) -> None:
+    """Render found and filtered mask overlays on the same micrograph."""
+    image = read_mode2_mrc(micrograph_path)
+    finite = image[np.isfinite(image)]
+    if finite.size == 0:
+        raise ValueError(f"Micrograph has no finite pixels: {micrograph_path}")
+    vmin, vmax = np.percentile(finite, contrast_percentiles)
+    display = image[::display_downsample, ::display_downsample]
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+    panels = [
+        (axes[0], found_mask, f"found n={found_count}", "Wistia"),
+        (axes[1], filtered_mask, f"filtered n={filtered_count}", "winter"),
+    ]
+    for ax, mask, label, cmap in panels:
+        ax.imshow(display, cmap="gray", origin="upper", vmin=vmin, vmax=vmax)
+        full = np.repeat(np.repeat(np.asarray(mask, dtype=bool), downsample, axis=0), downsample, axis=1)
+        full = full[: image.shape[0], : image.shape[1]]
+        shown = full[::display_downsample, ::display_downsample]
+        ax.imshow(
+            np.ma.masked_where(~shown, np.ones_like(shown)),
+            cmap=cmap,
+            alpha=0.35,
+            interpolation="nearest",
+        )
+        ax.set_title(label)
+        ax.set_axis_off()
+    fig.suptitle(title)
+    fig.tight_layout(pad=0.6)
+    fig.savefig(output_path, dpi=dpi)
+    plt.close(fig)
+
+
 def _scatter(
     ax,
     xy: np.ndarray,

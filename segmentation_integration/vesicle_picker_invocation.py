@@ -383,6 +383,12 @@ def render_end_to_end_script(
         vesicle_mask_dir,
         "--output-dir",
         filter_output_dir / "mask_filter_qc",
+        "--particles-cs",
+        particles_cs,
+        "--micrographs-dir",
+        micrographs_dir,
+        "--downsample",
+        PRESTIN_SETTINGS["downsample"],
     ]
     local_vesicle_command = [
         "python",

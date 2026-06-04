@@ -1,0 +1,16 @@
+# Non-PyTorch dependencies for running DRACO Denoise/B without conda.
+# Install PyTorch separately first so you can choose the CUDA wheel index.
+
+numpy<2.0.0
+h5py
+matplotlib
+pandas
+rich
+scipy
+fvcore
+mrcfile
+omegaconf
+timm
+opencv-python-headless
+pycocotools
+gdown

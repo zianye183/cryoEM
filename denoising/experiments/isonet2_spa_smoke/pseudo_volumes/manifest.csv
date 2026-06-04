@@ -1,0 +1,2 @@
+input_path,pseudo_volume_path,input_shape,image_shape,pseudo_shape,crop_size,inverted
+/nfs/bartesaghilab2/zy223/denoising/data/fuller_subset/FoilHole_6367920_Data_5347108_17_20260207_032343_fractions.mrc,/nfs/bartesaghilab2/zy223/denoising/experiments/isonet2_spa_smoke/pseudo_volumes/FoilHole_6367920_Data_5347108_17_20260207_032343_fractions.crop1024.pseudoZ96.mrc,1x4092x5760,1024x1024,96x1024x1024,1024,False

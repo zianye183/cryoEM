@@ -1,0 +1,41 @@
+# Initial small-subset denoising test configuration.
+# Source data are movie/fraction MRC files. Keep symlinks by default to avoid copying large files.
+
+project_root: /nfs/bartesaghilab2/zy223/denoising
+source_mrc_dir: /nfs/bartesaghilab/micromon/research-bartesaghilab-06/shared/users/zy223@duke.edu/projects/Prestin-1fhwPcd8gQ/sp-preprocessing-ghLbktywzmKi35IA/mrc
+subset_dir: /nfs/bartesaghilab2/zy223/denoising/data/subset
+results_dir: /nfs/bartesaghilab2/zy223/denoising/results
+subset_size: 5
+random_seed: 42
+use_symlinks: true
+
+# Topaz-Denoise notes:
+# - Pretrained 2D denoising is available through `topaz denoise` in Topaz >= 0.2.0.
+# - Topaz retraining is Noise2Noise-style and requires paired noisy observations, commonly even/odd
+#   frame sums from movie frames. The current source files are named *_fractions.mrc; verify whether
+#   they are frame stacks or already summed before retraining.
+topaz:
+    conda_env: topaz
+    device: 0
+    pretrained:
+        model: unet
+        patch_size: 4000
+        patch_padding: 500
+        output_dir: /nfs/bartesaghilab2/zy223/denoising/results/topaz_pretrained
+    retraining:
+        enabled: false
+        output_dir: /nfs/bartesaghilab2/zy223/denoising/results/topaz_retrained
+        notes: >-
+            Enable after preparing paired even/odd noisy micrographs or confirming Topaz can consume the
+            current fraction stacks directly for the intended training command.
+
+# DRACO notes:
+# - Repo provides inference code/notebooks and pretrained base denoising model (Denoise/B).
+# - Model parameters are restricted to non-commercial use by non-commercial organizations and should
+#   not be redistributed outside the organization.
+draco:
+    conda_env: draco
+    repo_url: https://github.com/Cellverse/draco.git
+    output_dir: /nfs/bartesaghilab2/zy223/denoising/results/draco_pretrained
+    pretrained_model: Denoise/B
+    model_weights_path: null # fill in after downloading/locating DRACO Denoise/B weights

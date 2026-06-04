@@ -1,0 +1,115 @@
+# Pilot configuration template for Prestin-specific Topaz fine-tuning.
+# Fill in data paths after even/odd split locations are confirmed.
+# Do not hardcode raw/preprocessed data paths into scripts; pass them through config/CLI.
+
+project:
+    name: prestin_topaz_finetune_pilot
+    root: /nfs/bartesaghilab2/zy223/finetuning
+    seed: 42
+
+inputs:
+    # Source data remains external/read-only; do not import or copy it into this project tree.
+    sample_dataset_dir: /nfs/bartesaghilab/micromon/research-bartesaghilab-06/shared/users/zy223@duke.edu/projects/Prestin-test-WNXj0kBZzgoPdMbE/sp-preprocessing-ghcTLDemYJJ8gcXE/mrc
+
+    # Option A: build the manifest from one directory containing complete micrographs plus half splits.
+    source_dir: /nfs/bartesaghilab/micromon/research-bartesaghilab-06/shared/users/zy223@duke.edu/projects/Prestin-test-WNXj0kBZzgoPdMbE/sp-preprocessing-ghcTLDemYJJ8gcXE/mrc
+    even_dir: null
+    odd_dir: null
+    mask_dir: null
+
+    # Option B: use a pre-existing manifest with columns defined in docs/topaz_finetuning_plan.md.
+    all_pairs_tsv: null
+
+    filename_matching:
+        even_suffix: _half1.mrc
+        odd_suffix: _half2.mrc
+        mask_suffix: _mask.mrc
+
+manifests:
+    output_dir: /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot
+    all_pairs: /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/all_pairs.tsv
+    train_pairs: /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/train_pairs.tsv
+    val_pairs: /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/val_pairs.tsv
+    test_pairs: /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/test_pairs.tsv
+    visual_panel: /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/visual_panel.tsv
+
+split:
+    pilot_total_pairs: 300
+    train_pairs: 240
+    val_pairs: 30
+    test_pairs: 30
+    stratify_by: [] # e.g. [session_id, defocus_group] if metadata is available.
+
+masking:
+    use_masks_for_topaz_training: false
+    keep_mask_metadata: true
+    evaluate_membrane_vs_background: true
+    draco_future_requirements:
+        require_mask_alignment_check: true
+        allow_exclusion_masks: true
+        record_mask_source_version: true
+
+topaz:
+    env_activate: /nfs/bartesaghilab2/zy223/venvs/topaz/bin/activate
+    device: 0
+
+    # Confirm these flags against `topaz denoise --help` before long jobs.
+    # This Topaz install trains through `topaz denoise --dir-a ... --dir-b ...`.
+    pretrained_model: unet
+    arch: unet
+    patch_size: null
+    patch_padding: null
+
+    baseline:
+        output_dir: /nfs/bartesaghilab2/zy223/finetuning/results/topaz_pretrained_pilot
+        run_on_splits: [val, test]
+        dry_run_first: true
+
+    finetune:
+        output_dir: /nfs/bartesaghilab2/zy223/finetuning/results/topaz_finetuned_pilot
+        dry_run_first: true
+        learning_rate: 1.0e-5
+        alternate_learning_rate: 3.0e-6
+        max_epochs: 20
+        batch_size: 4
+        crop: 800
+        holdout: 0.1
+        save_interval: 1
+        early_stopping: false # this Topaz CLI exposes --holdout, but no explicit early-stopping flag.
+        early_stopping_metric: external_val_loss
+        early_stopping_patience: 3
+        train_both_directions: true # symlink both even->odd and odd->even into --dir-a/--dir-b.
+
+evaluation:
+    output_dir: /nfs/bartesaghilab2/zy223/finetuning/results/evaluation_pilot
+    compare_models:
+        - topaz_pretrained_pilot
+        - topaz_finetuned_pilot
+
+    denoising_level:
+        validation_loss: true
+        fourier_spectra: true
+        high_frequency_noise_suppression: true
+        membrane_edge_preservation: true
+        hallucination_checks: true
+        visual_panels: true
+
+    consistency:
+        compare_d_even_d_odd: true
+        pixel_correlation: true
+        difference_maps: true
+        masked_consistency_if_masks_available: true
+        flag_artificial_background_correlation: true
+
+    downstream:
+        milopyp_exploration: planned
+        pick_count_and_spatial_distribution: planned
+        class_2d_averages: planned
+        membrane_density_preservation: planned
+
+reporting:
+    require_command_log: true
+    require_topaz_version: true
+    require_manifest_hashes: true
+    require_artifact_notes: true
+    decision_labels: [reject, repeat, scale_up]

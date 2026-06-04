@@ -1,0 +1,114 @@
+# Local editor / OS files
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+*.swp
+*.swo
+*~
+.zed/
+.vscode/
+.idea/
+
+# Python caches and build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# Jupyter / notebooks
+.ipynb_checkpoints/
+
+# Project-local Python, Conda, and package caches
+venvs/
+.venv/
+venv/
+env/
+ENV/
+conda_envs/
+conda_pkgs/
+conda_pkgs_fresh/
+pip_cache/
+.pyenv/
+.cache/
+.local/
+
+# Temporary / scratch outputs
+tmp/
+temp/
+scratch/
+logs/
+*.log
+
+# Cryo-EM raw/preprocessed data and large generated files
+# Keep raw micrographs, maps, stacks, checkpoints, and denoising outputs out of Git.
+*.mrc
+*.mrcs
+*.map
+*.star
+*.cs
+*.eer
+*.tif
+*.tiff
+*.dm4
+*.h5
+*.hdf
+*.hdf5
+*.npy
+*.npz
+*.pt
+*.pth
+*.ckpt
+*.pkl
+*.pickle
+
+# Common experiment output directories
+outputs/
+output/
+results/
+checkpoints/
+models/
+runs/
+wandb/
+tensorboard/
+lightning_logs/
+denoised/
+denoising_outputs/
+preprocessed/
+micrographs/
+movies/
+particles/
+
+# CryoSPARC / Topaz generated working data
+cryosparc/
+topaz_cryosparc_debug.log
+*_half1*.mrc
+*_half2*.mrc
+
+# Archives and transfers
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+*.rar
+
+# Secrets / local environment files
+.env
+.env.*
+*.secret
+*.key
+*.pem
+
+
+topaz_picker_2_github/

@@ -1,0 +1,22 @@
+{
+  "CTF_mode": "none",
+  "arch": "unet-medium",
+  "checkpoint_keys": [
+    "CTF_mode",
+    "arch",
+    "cube_size",
+    "do_phaseflip_input",
+    "method",
+    "metrics",
+    "model_state_dict"
+  ],
+  "cube_size": 96,
+  "do_phaseflip_input": true,
+  "method": "isonet2-n2n",
+  "metrics_keys": [
+    "average_loss",
+    "inside_loss",
+    "outside_loss"
+  ],
+  "model_path": "/nfs/bartesaghilab/nextpyp/workshop_dhvi/10453/isonet_network_isonet2-n2n_unet-medium_96_full.pt"
+}

@@ -1,0 +1,16 @@
+{
+  "crop_size": 1024,
+  "defocus_A": 10000.0,
+  "depth": "auto",
+  "dry_run_predict": false,
+  "fallback_pixel_size": 1.0,
+  "inputs": [
+    "/nfs/bartesaghilab2/zy223/denoising/data/fuller_subset"
+  ],
+  "limit": 1,
+  "model": "/nfs/bartesaghilab/nextpyp/workshop_dhvi/10453/isonet_network_isonet2-n2n_unet-medium_96_full.pt",
+  "pixel_size": "auto",
+  "run_predict": true,
+  "stack_policy": "error",
+  "work_dir": "/nfs/bartesaghilab2/zy223/denoising/experiments/isonet2_spa_smoke"
+}

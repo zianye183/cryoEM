@@ -1,0 +1,30 @@
+{
+  "apply_mw_x1": false,
+  "command": [
+    "isonet.py",
+    "predict",
+    "/nfs/bartesaghilab2/zy223/denoising/experiments/isonet2_spa_smoke/stars/spa_pseudo.star",
+    "/nfs/bartesaghilab/nextpyp/workshop_dhvi/10453/isonet_network_isonet2-n2n_unet-medium_96_full.pt",
+    "--output_dir",
+    "/nfs/bartesaghilab2/zy223/denoising/experiments/isonet2_spa_smoke/predict",
+    "--gpuID",
+    "0",
+    "--apply_mw_x1",
+    "False",
+    "--isCTFflipped",
+    "True",
+    "--padding_factor",
+    "1.5",
+    "--output_prefix",
+    "spa_smoke",
+    "--save_slices",
+    "False"
+  ],
+  "gpu_id": "0",
+  "is_ctf_flipped": true,
+  "model": "/nfs/bartesaghilab/nextpyp/workshop_dhvi/10453/isonet_network_isonet2-n2n_unet-medium_96_full.pt",
+  "output_dir": "/nfs/bartesaghilab2/zy223/denoising/experiments/isonet2_spa_smoke/predict",
+  "output_prefix": "spa_smoke",
+  "padding_factor": 1.5,
+  "star": "/nfs/bartesaghilab2/zy223/denoising/experiments/isonet2_spa_smoke/stars/spa_pseudo.star"
+}

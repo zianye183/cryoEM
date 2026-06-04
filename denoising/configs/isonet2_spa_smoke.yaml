@@ -1,0 +1,28 @@
+# Minimal IsoNet2 prediction-only SPA smoke-test configuration.
+# This is not a scientifically validated SPA denoising method. It wraps each
+# 2D micrograph as a repeated-depth pseudo-volume so a pretrained 3D IsoNet2
+# model can be run for qualitative readout.
+
+model_path: /nfs/bartesaghilab/nextpyp/workshop_dhvi/10453/isonet_network_isonet2-n2n_unet-medium_96_full.pt
+input_dir: /nfs/bartesaghilab2/zy223/denoising/data/fuller_subset
+work_dir: /nfs/bartesaghilab2/zy223/denoising/experiments/isonet2_spa_smoke
+limit: 3
+pseudo_depth: auto # uses checkpoint cube_size, expected 96
+crop_size: 1024 # center-crop before fake-Z wrapping to avoid huge pseudo-volumes/OOM
+stack_policy: error # micrographs are expected to be 2D; use mean/first only if intentionally processing stacks
+invert_input: false
+
+star:
+    pixel_size: auto # read from MRC header, fallback below if missing
+    fallback_pixel_size: 1.0
+    defocus_A: 10000.0
+    voltage_kv: 300.0
+    cs_mm: 2.7
+    amplitude_contrast: 0.1
+
+predict:
+    isonet_command: isonet.py
+    gpu_id: "0"
+    apply_mw_x1: false
+    is_ctf_flipped: true
+    output_prefix: spa_smoke

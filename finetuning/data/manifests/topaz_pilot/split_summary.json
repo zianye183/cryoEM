@@ -1,0 +1,30 @@
+{
+  "input": "/nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/all_pairs.tsv",
+  "input_sha256": "778f1c4718f25da8044206f6d830788c65b95b181837c807c27d14cb49641c30",
+  "limit": 300,
+  "outputs": {
+    "test_pairs": "/nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/test_pairs.tsv",
+    "train_pairs": "/nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/train_pairs.tsv",
+    "val_pairs": "/nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/val_pairs.tsv",
+    "visual_panel": "/nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/visual_panel.tsv"
+  },
+  "seed": 42,
+  "test": {
+    "pairs": 30,
+    "shape_counts": {},
+    "with_complete_micrograph": 30,
+    "with_mask": 0
+  },
+  "train": {
+    "pairs": 240,
+    "shape_counts": {},
+    "with_complete_micrograph": 240,
+    "with_mask": 0
+  },
+  "val": {
+    "pairs": 30,
+    "shape_counts": {},
+    "with_complete_micrograph": 30,
+    "with_mask": 0
+  }
+}

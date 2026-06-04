@@ -1,0 +1,7 @@
+# Rebuild /nfs/bartesaghilab2/zy223/venvs/topaz with:
+#   python3 -m venv /nfs/bartesaghilab2/zy223/venvs/topaz
+#   /nfs/bartesaghilab2/zy223/venvs/topaz/bin/python -m pip install --upgrade pip wheel setuptools
+#   /nfs/bartesaghilab2/zy223/venvs/topaz/bin/python -m pip install -r /nfs/bartesaghilab2/zy223/denoising/envs/topaz-requirements.txt
+#
+# Note: topaz-em pulls PyTorch/torchvision and CUDA runtime wheels from PyPI.
+topaz-em==0.3.20

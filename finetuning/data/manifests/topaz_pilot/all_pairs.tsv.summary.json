@@ -1,0 +1,10 @@
+{
+  "even_suffix": "_half1.mrc",
+  "odd_suffix": "_half2.mrc",
+  "output": "/nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/all_pairs.tsv",
+  "pairs": 300,
+  "shape_counts": {},
+  "source_dir": "/nfs/bartesaghilab/micromon/research-bartesaghilab-06/shared/users/zy223@duke.edu/projects/Prestin-test-WNXj0kBZzgoPdMbE/sp-preprocessing-ghcTLDemYJJ8gcXE/mrc",
+  "with_complete_micrograph": 300,
+  "with_mask": 0
+}

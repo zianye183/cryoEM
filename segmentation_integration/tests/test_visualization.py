@@ -8,6 +8,7 @@ from segmentation_integration.mrc_io import write_mode2_mrc_for_test
 from segmentation_integration.visualization import (
     render_mask_png,
     render_overlay,
+    render_mask_comparison_png,
 )
 
 
@@ -45,6 +46,26 @@ class VisualizationTests(unittest.TestCase):
                 output_path=out_path,
                 membrane_band=band,
                 title="mic_a membrane band",
+            )
+
+            self.assertGreater(out_path.stat().st_size, 0)
+
+    def test_render_mask_comparison_png_writes_found_vs_filtered_preview(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            out_path = root / "comparison.png"
+            found = np.zeros((8, 8), dtype=bool)
+            filtered = np.zeros((8, 8), dtype=bool)
+            found[1:5, 1:5] = True
+            filtered[2:4, 2:4] = True
+
+            render_mask_comparison_png(
+                output_path=out_path,
+                found_mask=found,
+                filtered_mask=filtered,
+                title="uid 7",
+                found_count=3,
+                filtered_count=1,
             )
 
             self.assertGreater(out_path.stat().st_size, 0)

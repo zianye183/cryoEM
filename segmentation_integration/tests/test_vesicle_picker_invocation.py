@@ -46,6 +46,8 @@ class VesiclePickerInvocationTests(unittest.TestCase):
         self.assertIn("find_vesicles.py", script)
         self.assertIn("filter_vesicles.py", script)
         self.assertIn("[segmentation integration] generating vesicle masks", script)
+        self.assertIn("[segmentation integration] visualizing found vs filtered masks", script)
+        self.assertIn("visualize_vesicle_mask_filtering.py", script)
         self.assertIn("[segmentation integration] visualizing masks", script)
         self.assertIn("[segmentation integration] filtering particle picks", script)
         self.assertLess(script.index("filter_vesicles.py"), script.index("visualize_vesicle_masks.py"))

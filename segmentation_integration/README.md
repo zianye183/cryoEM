@@ -72,9 +72,19 @@ bash /path/to/segmentation_run/run_end_to_end.sh
 ```
 
 The shell script runs Vesicle Picker `find_vesicles.py`, Vesicle Picker
-`filter_vesicles.py`, standalone mask visualization, and then this repo's
-CryoSPARC particle filter. The mask PNGs are produced immediately after
-Vesicle Picker filtering under `filtered_particles/masks/`.
+`filter_vesicles.py`, upstream found-vs-filtered mask QC, standalone mask
+visualization, and then this repo's CryoSPARC particle filter. The upstream QC
+PNGs and mask stats are produced under `filtered_particles/mask_filter_qc/`.
+The final membrane-band mask PNGs are produced under `filtered_particles/masks/`.
+
+To render upstream QC from existing Vesicle Picker outputs:
+
+```bash
+python segmentation_integration/scripts/visualize_vesicle_mask_filtering.py \
+  --found-mask-dir /path/to/vesicle_masks_found \
+  --filtered-mask-dir /path/to/vesicle_masks_filtered \
+  --output-dir /path/to/filter_output/mask_filter_qc
+```
 
 ## Filter-only command
 

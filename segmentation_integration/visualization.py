@@ -80,6 +80,33 @@ def render_mask_png(
     plt.close(fig)
 
 
+def render_mask_comparison_png(
+    *,
+    output_path: Path,
+    found_mask: np.ndarray,
+    filtered_mask: np.ndarray,
+    title: str,
+    found_count: int,
+    filtered_count: int,
+    dpi: int = 180,
+) -> None:
+    """Render found SAM mask union next to post-filter mask union."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+    panels = [
+        (axes[0], found_mask, f"found n={found_count}"),
+        (axes[1], filtered_mask, f"filtered n={filtered_count}"),
+    ]
+    for ax, mask, label in panels:
+        ax.imshow(np.asarray(mask, dtype=np.uint8), cmap="gray", vmin=0, vmax=1, origin="upper")
+        ax.set_title(label)
+        ax.set_axis_off()
+    fig.suptitle(title)
+    fig.tight_layout(pad=0.6)
+    fig.savefig(output_path, dpi=dpi)
+    plt.close(fig)
+
+
 def _scatter(
     ax,
     xy: np.ndarray,

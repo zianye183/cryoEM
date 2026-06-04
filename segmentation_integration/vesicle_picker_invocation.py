@@ -374,6 +374,16 @@ def render_end_to_end_script(
         PRESTIN_SETTINGS["membrane_band_a"],
         "--skip-mask-pngs",
     ]
+    upstream_qc_command = [
+        "python",
+        "segmentation_integration/scripts/visualize_vesicle_mask_filtering.py",
+        "--found-mask-dir",
+        find_parameters.parent.parent / "vesicle_masks_found",
+        "--filtered-mask-dir",
+        vesicle_mask_dir,
+        "--output-dir",
+        filter_output_dir / "mask_filter_qc",
+    ]
     local_vesicle_command = [
         "python",
         "segmentation_integration/scripts/run_local_vesicle_picker.py",
@@ -409,6 +419,9 @@ VESICLE_PICKER_DIR={shlex.quote(str(vesicle_picker_dir))}
 
 echo "[segmentation integration] generating vesicle masks"
 {vesicle_picker_commands}
+
+echo "[segmentation integration] visualizing found vs filtered masks"
+{quote_command(upstream_qc_command)}
 
 echo "[segmentation integration] visualizing masks"
 {quote_command(visualize_command)}

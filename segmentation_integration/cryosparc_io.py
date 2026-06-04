@@ -109,8 +109,19 @@ def patch_csg_cs_path(
     original_cs_name: str,
     new_cs_path: Path,
 ) -> None:
-    """Copy a `.csg` JSON file, replacing exactly one referenced `.cs` path."""
-    data = json.loads(source_csg.read_text())
+    """Copy a `.csg` file, replacing exactly one referenced `.cs` path."""
+    text = source_csg.read_text()
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        patched_text, count = _replace_text_cs_reference(text, original_cs_name, str(new_cs_path))
+        if count == 0:
+            raise ValueError(f"No .cs reference matching {original_cs_name!r} found in {source_csg}")
+        if count > 1:
+            raise ValueError(f"Ambiguous .cs references matching {original_cs_name!r} found in {source_csg}")
+        output_csg.parent.mkdir(parents=True, exist_ok=True)
+        output_csg.write_text(patched_text)
+        return
     patched, count = _replace_cs_reference(data, original_cs_name, str(new_cs_path))
     if count == 0:
         raise ValueError(f"No .cs reference matching {original_cs_name!r} found in {source_csg}")
@@ -118,6 +129,11 @@ def patch_csg_cs_path(
         raise ValueError(f"Ambiguous .cs references matching {original_cs_name!r} found in {source_csg}")
     output_csg.parent.mkdir(parents=True, exist_ok=True)
     output_csg.write_text(json.dumps(patched, indent=2) + "\n")
+
+
+def _replace_text_cs_reference(text: str, original_cs_name: str, new_cs_path: str) -> tuple[str, int]:
+    pattern = re.compile(rf">?[^\s'\"\]]*{re.escape(original_cs_name)}")
+    return pattern.subn(new_cs_path, text)
 
 
 def _replace_cs_reference(value: Any, original_cs_name: str, new_cs_path: str) -> tuple[Any, int]:

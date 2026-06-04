@@ -78,6 +78,18 @@ class CryosparcIoTests(unittest.TestCase):
 
         self.assertEqual(patched["files"][0]["path"], str(root / "filtered_particles.cs"))
 
+    def test_patch_csg_replaces_single_yaml_referenced_cs_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            csg = root / "particles.csg"
+            csg.write_text("files:\n  - path: >J71_particles_exported.cs\n")
+
+            patch_csg_cs_path(csg, root / "filtered.csg", "J71_particles_exported.cs", root / "filtered_particles.cs")
+            patched = (root / "filtered.csg").read_text()
+
+        self.assertIn(f"path: {root / 'filtered_particles.cs'}", patched)
+        self.assertNotIn(">J71_particles_exported.cs", patched)
+
     def test_patch_csg_rejects_ambiguous_references(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

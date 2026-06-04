@@ -90,6 +90,37 @@ class CryosparcIoTests(unittest.TestCase):
         self.assertIn(f"path: {root / 'filtered_particles.cs'}", patched)
         self.assertNotIn(">J71_particles_exported.cs", patched)
 
+    def test_patch_csg_replaces_repeated_same_yaml_referenced_cs_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            csg = root / "particles.csg"
+            csg.write_text(
+                "files:\n"
+                "  - path: >exports/groups/J71_particles/J71_particles_exported.cs\n"
+                "metadata:\n"
+                "  source: >exports/groups/J71_particles/J71_particles_exported.cs\n"
+            )
+
+            patch_csg_cs_path(csg, root / "filtered.csg", "J71_particles_exported.cs", root / "filtered_particles.cs")
+            patched = (root / "filtered.csg").read_text()
+
+        self.assertEqual(patched.count(str(root / "filtered_particles.cs")), 2)
+        self.assertNotIn("J71_particles_exported.cs", patched)
+
+    def test_patch_csg_rejects_different_yaml_referenced_cs_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            csg = root / "particles.csg"
+            csg.write_text(
+                "files:\n"
+                "  - path: >exports/a/J71_particles_exported.cs\n"
+                "metadata:\n"
+                "  source: >exports/b/J71_particles_exported.cs\n"
+            )
+
+            with self.assertRaisesRegex(ValueError, "Ambiguous"):
+                patch_csg_cs_path(csg, root / "filtered.csg", "J71_particles_exported.cs", root / "filtered_particles.cs")
+
     def test_patch_csg_rejects_ambiguous_references(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

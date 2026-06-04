@@ -114,11 +114,13 @@ def patch_csg_cs_path(
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        patched_text, count = _replace_text_cs_reference(text, original_cs_name, str(new_cs_path))
+        matches = _find_text_cs_references(text, original_cs_name)
+        count = len(matches)
         if count == 0:
             raise ValueError(f"No .cs reference matching {original_cs_name!r} found in {source_csg}")
-        if count > 1:
+        if len(set(matches)) > 1:
             raise ValueError(f"Ambiguous .cs references matching {original_cs_name!r} found in {source_csg}")
+        patched_text = text.replace(matches[0], str(new_cs_path))
         output_csg.parent.mkdir(parents=True, exist_ok=True)
         output_csg.write_text(patched_text)
         return
@@ -131,9 +133,9 @@ def patch_csg_cs_path(
     output_csg.write_text(json.dumps(patched, indent=2) + "\n")
 
 
-def _replace_text_cs_reference(text: str, original_cs_name: str, new_cs_path: str) -> tuple[str, int]:
+def _find_text_cs_references(text: str, original_cs_name: str) -> list[str]:
     pattern = re.compile(rf">?[^\s'\"\]]*{re.escape(original_cs_name)}")
-    return pattern.subn(new_cs_path, text)
+    return pattern.findall(text)
 
 
 def _replace_cs_reference(value: Any, original_cs_name: str, new_cs_path: str) -> tuple[Any, int]:

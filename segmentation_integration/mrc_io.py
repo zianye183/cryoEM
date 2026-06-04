@@ -13,6 +13,7 @@ MRC_MODE_DTYPES = {
     1: "<i2",
     2: "<f4",
     6: "<u2",
+    12: "<f2",
 }
 
 
@@ -27,6 +28,11 @@ def read_mrc(path: Path) -> np.ndarray:
         if dtype is None:
             supported = ", ".join(str(mode) for mode in sorted(MRC_MODE_DTYPES))
             raise ValueError(f"Unsupported MRC mode {mode}; supported modes are {supported}: {path}")
+        (extended_header_bytes,) = struct.unpack("<i", header[92:96])
+        if extended_header_bytes < 0:
+            raise ValueError(f"MRC extended header byte count is negative: {path}")
+        if extended_header_bytes:
+            handle.seek(extended_header_bytes, 1)
         count = nx * ny * max(nz, 1)
         data = np.fromfile(handle, dtype=dtype, count=count)
     if data.size != count:

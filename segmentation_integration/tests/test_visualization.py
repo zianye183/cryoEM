@@ -77,10 +77,13 @@ class VisualizationTests(unittest.TestCase):
             out_path = root / "metrics.png"
             segmentation = np.zeros((8, 8), dtype=bool)
             segmentation[2:6, 2:6] = True
+            rejected = np.zeros((8, 8), dtype=bool)
+            rejected[0:2, 0:2] = True
 
             render_mask_metrics_png(
                 output_path=out_path,
                 masks=[{"segmentation": segmentation, "area": 16, "roundness": 0.87}],
+                rejected_masks=[{"segmentation": rejected, "area": 4, "roundness": 0.5}],
                 title="uid 7",
             )
 

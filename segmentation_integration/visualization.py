@@ -226,6 +226,7 @@ def render_mask_metrics_png(
     output_path: Path,
     masks: list[dict],
     title: str,
+    rejected_masks: list[dict] | None = None,
     micrograph_path: Path | None = None,
     downsample: int = 4,
     contrast_percentiles: tuple[float, float] = (1, 99),
@@ -233,6 +234,8 @@ def render_mask_metrics_png(
     dpi: int = 180,
 ) -> None:
     """Render mask contours with per-vesicle area and roundness labels."""
+    rejected_masks = rejected_masks or []
+    all_masks = [*masks, *rejected_masks]
     output_path.parent.mkdir(parents=True, exist_ok=True)
     if micrograph_path is not None:
         image = read_mode2_mrc(micrograph_path)
@@ -250,19 +253,26 @@ def render_mask_metrics_png(
     if display is not None:
         ax.imshow(display, cmap="gray", origin="upper", vmin=vmin, vmax=vmax)
     else:
-        shape = _first_mask_shape([np.asarray(mask["segmentation"], dtype=bool) for mask in masks])
+        shape = _first_mask_shape([np.asarray(mask["segmentation"], dtype=bool) for mask in all_masks])
         ax.imshow(np.zeros(shape, dtype=np.uint8), cmap="gray", vmin=0, vmax=1, origin="upper")
 
-    mask_arrays = [np.asarray(mask["segmentation"], dtype=bool) for mask in masks]
     _imshow_mask_contours(
         ax,
-        mask_arrays,
-        color=(0.0, 0.85, 1.0, 0.95),
+        [np.asarray(mask["segmentation"], dtype=bool) for mask in rejected_masks],
+        color=(1.0, 0.0, 0.0, 0.95),
         downsample=downsample,
         display_downsample=display_downsample,
         image_shape=image.shape if image is not None else None,
     )
-    for mask in masks:
+    _imshow_mask_contours(
+        ax,
+        [np.asarray(mask["segmentation"], dtype=bool) for mask in masks],
+        color=(0.0, 1.0, 0.0, 0.95),
+        downsample=downsample,
+        display_downsample=display_downsample,
+        image_shape=image.shape if image is not None else None,
+    )
+    for mask in all_masks:
         _annotate_mask_metrics(
             ax,
             mask,
@@ -270,7 +280,7 @@ def render_mask_metrics_png(
             display_downsample=display_downsample,
             image_shape=image.shape if image is not None else None,
         )
-    ax.set_title("vesicle metrics: area and roundness")
+    ax.set_title("vesicle metrics: accepted green, rejected red")
     ax.set_axis_off()
     fig.suptitle(title)
     fig.tight_layout(pad=0.6)

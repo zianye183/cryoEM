@@ -21,6 +21,12 @@ draco -> particles: /nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/expor
          micrographs: /nfs/bartesaghilab2/zy223/denoising/results/draco_pretrained_fuller_subset
 ```
 
+Segmentation run directories live under:
+
+```text
+/nfs/bartesaghilab2/zy223/segmentation_runs/{name}
+```
+
 The Vesicle Picker checkout is recorded as:
 
 ```text

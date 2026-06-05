@@ -59,11 +59,12 @@ class LocalVesiclePickerTests(unittest.TestCase):
             found_masks=4,
             filtered_masks=3,
             status="done",
+            elapsed_seconds=1.234,
         )
 
         self.assertEqual(
             stream.getvalue().strip(),
-            "[local vesicle picker] 2/5 uid=17 status=done found=4 filtered=3 mic=mic.mrc",
+            "[local vesicle picker] 2/5 uid=17 status=done found=4 filtered=3 elapsed=1.23s mic=mic.mrc",
         )
 
     def test_export_masks_to_disk_without_mutating_keeps_segmentation_for_filtering(self) -> None:

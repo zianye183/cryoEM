@@ -9,6 +9,7 @@ import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from time import monotonic
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -101,6 +102,7 @@ def run_local_vesicle_picker(
     skipped_empty = 0
     total = len(records)
     for index, record in enumerate(records, start=1):
+        image_started_at = monotonic()
         if should_emit_progress(index, progress_every):
             emit_progress(progress_stream, index=index, total=total, record=record, status="start")
         image_fullres = read_mrc(record.path)
@@ -138,6 +140,7 @@ def run_local_vesicle_picker(
                     found_masks=0,
                     filtered_masks=0,
                     status="empty",
+                    elapsed_seconds=monotonic() - image_started_at,
                 )
             continue
 
@@ -183,6 +186,7 @@ def run_local_vesicle_picker(
                     found_masks=len(postprocessed_masks),
                     filtered_masks=0,
                     status="filtered_empty",
+                    elapsed_seconds=monotonic() - image_started_at,
                 )
             continue
         filtered_path = filtered_dir / f"{record.uid}_vesicles_filtered.pkl"
@@ -203,6 +207,7 @@ def run_local_vesicle_picker(
                 found_masks=len(postprocessed_masks),
                 filtered_masks=len(filtered_masks),
                 status="done",
+                elapsed_seconds=monotonic() - image_started_at,
             )
 
     return {
@@ -237,6 +242,7 @@ def emit_progress(
     status: str,
     found_masks: int | None = None,
     filtered_masks: int | None = None,
+    elapsed_seconds: float | None = None,
 ) -> None:
     parts = [
         "[local vesicle picker]",
@@ -248,6 +254,8 @@ def emit_progress(
         parts.append(f"found={found_masks}")
     if filtered_masks is not None:
         parts.append(f"filtered={filtered_masks}")
+    if elapsed_seconds is not None:
+        parts.append(f"elapsed={elapsed_seconds:.2f}s")
     parts.append(f"mic={record.path.name}")
     print(" ".join(parts), file=stream, flush=True)
 

@@ -125,14 +125,14 @@ class VesicleFilteringTests(unittest.TestCase):
             r"^\[particle filter\] 2/2 uid=8 status=missing_mask kept=0 rejected=1 elapsed=\d+\.\d{2}s mic=mic_b.mrc$",
         )
 
-    def test_csg_cs_reference_path_is_project_relative_for_project_exports(self) -> None:
+    def test_csg_cs_reference_path_is_csg_directory_relative_for_project_exports(self) -> None:
         project = Path("/nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin")
         particles_csg = project / "exports/groups/J71_particles/J71_particles_exported.csg"
         filtered_cs = project / "exports/groups/raw_fuller_filtered_particles/filtered_particles.cs"
 
         reference = csg_cs_reference_path(filtered_cs, particles_csg)
 
-        self.assertEqual(reference, Path("exports/groups/raw_fuller_filtered_particles/filtered_particles.cs"))
+        self.assertEqual(reference, Path("filtered_particles.cs"))
 
 
 if __name__ == "__main__":

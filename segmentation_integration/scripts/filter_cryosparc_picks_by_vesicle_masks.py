@@ -132,22 +132,12 @@ def main() -> None:
 
 
 def csg_cs_reference_path(cs_path: Path, particles_csg: Path) -> Path:
-    """Return the `.cs` reference path CryoSPARC should see inside an imported `.csg`."""
-    project_dir = cryosparc_project_dir_from_export_path(particles_csg)
-    if project_dir is None:
-        return cs_path
-    try:
-        return cs_path.relative_to(project_dir)
-    except ValueError:
-        return cs_path
+    """Return the `.cs` reference path CryoSPARC should see inside an imported `.csg`.
 
-
-def cryosparc_project_dir_from_export_path(path: Path) -> Path | None:
-    parts = path.parts
-    for index in range(len(parts) - 1):
-        if parts[index : index + 2] == ("exports", "groups"):
-            return Path(*parts[:index])
-    return None
+    Import Result Group resolves `.cs` references relative to the imported `.csg`
+    directory, so same-directory outputs should be referenced by basename.
+    """
+    return Path(cs_path.name)
 
 
 def render_overlays(args: argparse.Namespace, particles: np.ndarray, result, low_high: tuple[float, float]) -> None:

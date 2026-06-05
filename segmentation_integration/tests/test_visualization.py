@@ -9,6 +9,7 @@ from segmentation_integration.visualization import (
     render_mask_png,
     render_overlay,
     render_mask_comparison_png,
+    render_mask_metrics_png,
 )
 
 
@@ -66,6 +67,21 @@ class VisualizationTests(unittest.TestCase):
                 title="uid 7",
                 found_count=3,
                 filtered_count=1,
+            )
+
+            self.assertGreater(out_path.stat().st_size, 0)
+
+    def test_render_mask_metrics_png_writes_area_roundness_labels(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            out_path = root / "metrics.png"
+            segmentation = np.zeros((8, 8), dtype=bool)
+            segmentation[2:6, 2:6] = True
+
+            render_mask_metrics_png(
+                output_path=out_path,
+                masks=[{"segmentation": segmentation, "area": 16, "roundness": 0.87}],
+                title="uid 7",
             )
 
             self.assertGreater(out_path.stat().st_size, 0)

@@ -91,9 +91,11 @@ class UpstreamMaskQcTests(unittest.TestCase):
 
             stats = (output_dir / "mask_filter_stats.tsv").read_text()
             comparison_size = (output_dir / "7_found_filter_debug.png").stat().st_size
+            metrics_size = (output_dir / "7_filtered_mask_metrics.png").stat().st_size
 
         self.assertEqual(summary["rendered_comparisons"], 1)
         self.assertGreater(comparison_size, 0)
+        self.assertGreater(metrics_size, 0)
         self.assertIn("uid\tstage\tmask_index\tstatus\treject_reasons\tarea\troundness", stats)
         self.assertIn("7\tfound\t0\tkept\t\t36\t0.5", stats)
         self.assertIn("7\tfiltered\t0\toutput\t\t36\t0.5", stats)
@@ -121,10 +123,12 @@ class UpstreamMaskQcTests(unittest.TestCase):
 
             stats = (output_dir / "mask_filter_stats.tsv").read_text()
             debug_size = (output_dir / "7_found_filter_debug.png").stat().st_size
+            metrics_size = (output_dir / "7_filtered_mask_metrics.png").stat().st_size
 
         self.assertEqual(summary["found_masks_kept"], 1)
         self.assertEqual(summary["found_masks_rejected"], 1)
         self.assertGreater(debug_size, 0)
+        self.assertGreater(metrics_size, 0)
         self.assertIn("uid\tstage\tmask_index\tstatus\treject_reasons", stats)
         self.assertIn("7\tfound\t0\trejected\tarea_min", stats)
         self.assertIn("7\tfound\t1\tkept\t", stats)

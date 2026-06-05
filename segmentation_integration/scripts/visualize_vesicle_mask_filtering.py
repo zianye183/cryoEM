@@ -23,7 +23,11 @@ from segmentation_integration.cryosparc_io import (
     resolve_micrograph_path,
 )
 from segmentation_integration.vesicle_masks import load_vesicle_masks
-from segmentation_integration.visualization import render_mask_comparison_png, render_mask_filter_debug_png
+from segmentation_integration.visualization import (
+    render_mask_comparison_png,
+    render_mask_filter_debug_png,
+    render_mask_metrics_png,
+)
 
 
 STATS_FIELDS = ("area", "roundness", "average_radius_A", "semi_minor_A", "semi_major_A")
@@ -91,6 +95,15 @@ def render_mask_filter_qc(
             found_kept_masks=[np.asarray(item["mask"]["segmentation"], dtype=bool) for item in classified if not item["reject_reasons"]],
             found_rejected_masks=[np.asarray(item["mask"]["segmentation"], dtype=bool) for item in classified if item["reject_reasons"]],
             filtered_masks=[np.asarray(mask["segmentation"], dtype=bool) for mask in filtered_masks],
+            downsample=downsample,
+            title=f"uid {uid}" + (f" {micrograph_path.name}" if micrograph_path is not None else ""),
+            contrast_percentiles=contrast_percentiles,
+            display_downsample=display_downsample,
+        )
+        render_mask_metrics_png(
+            micrograph_path=micrograph_path,
+            output_path=output_dir / f"{uid}_filtered_mask_metrics.png",
+            masks=filtered_masks,
             downsample=downsample,
             title=f"uid {uid}" + (f" {micrograph_path.name}" if micrograph_path is not None else ""),
             contrast_percentiles=contrast_percentiles,

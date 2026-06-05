@@ -221,6 +221,63 @@ def render_mask_filter_debug_png(
     plt.close(fig)
 
 
+def render_mask_metrics_png(
+    *,
+    output_path: Path,
+    masks: list[dict],
+    title: str,
+    micrograph_path: Path | None = None,
+    downsample: int = 4,
+    contrast_percentiles: tuple[float, float] = (1, 99),
+    display_downsample: int = 4,
+    dpi: int = 180,
+) -> None:
+    """Render mask contours with per-vesicle area and roundness labels."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    if micrograph_path is not None:
+        image = read_mode2_mrc(micrograph_path)
+        finite = image[np.isfinite(image)]
+        if finite.size == 0:
+            raise ValueError(f"Micrograph has no finite pixels: {micrograph_path}")
+        vmin, vmax = np.percentile(finite, contrast_percentiles)
+        display = image[::display_downsample, ::display_downsample]
+    else:
+        image = None
+        display = None
+        vmin = vmax = None
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+    if display is not None:
+        ax.imshow(display, cmap="gray", origin="upper", vmin=vmin, vmax=vmax)
+    else:
+        shape = _first_mask_shape([np.asarray(mask["segmentation"], dtype=bool) for mask in masks])
+        ax.imshow(np.zeros(shape, dtype=np.uint8), cmap="gray", vmin=0, vmax=1, origin="upper")
+
+    mask_arrays = [np.asarray(mask["segmentation"], dtype=bool) for mask in masks]
+    _imshow_mask_contours(
+        ax,
+        mask_arrays,
+        color=(0.0, 0.85, 1.0, 0.95),
+        downsample=downsample,
+        display_downsample=display_downsample,
+        image_shape=image.shape if image is not None else None,
+    )
+    for mask in masks:
+        _annotate_mask_metrics(
+            ax,
+            mask,
+            downsample=downsample,
+            display_downsample=display_downsample,
+            image_shape=image.shape if image is not None else None,
+        )
+    ax.set_title("vesicle metrics: area and roundness")
+    ax.set_axis_off()
+    fig.suptitle(title)
+    fig.tight_layout(pad=0.6)
+    fig.savefig(output_path, dpi=dpi)
+    plt.close(fig)
+
+
 def _first_mask_shape(*mask_groups: list[np.ndarray]) -> tuple[int, int]:
     for group in mask_groups:
         for mask in group:
@@ -255,6 +312,48 @@ def _imshow_mask_contours(
     rgba = np.zeros((*shown.shape, 4), dtype=float)
     rgba[shown] = color
     ax.imshow(rgba, interpolation="nearest", origin="upper")
+
+
+def _annotate_mask_metrics(
+    ax,
+    mask: dict,
+    *,
+    downsample: int,
+    display_downsample: int,
+    image_shape: tuple[int, int] | None,
+) -> None:
+    segmentation = np.asarray(mask["segmentation"], dtype=bool)
+    if not segmentation.any():
+        return
+    rows, cols = np.nonzero(segmentation)
+    if image_shape is not None:
+        scale = downsample / display_downsample
+    else:
+        scale = 1
+    x = float(np.mean(cols)) * scale
+    y = float(np.mean(rows)) * scale
+    area = _format_metric(mask.get("area"))
+    roundness = _format_metric(mask.get("roundness"), digits=2)
+    ax.annotate(
+        f"A={area}\nR={roundness}",
+        xy=(x, y),
+        xytext=(4, 4),
+        textcoords="offset points",
+        color="white",
+        fontsize=5.5,
+        ha="left",
+        va="bottom",
+        bbox={"boxstyle": "round,pad=0.15", "facecolor": "black", "edgecolor": "none", "alpha": 0.65},
+    )
+
+
+def _format_metric(value, *, digits: int = 0) -> str:
+    if value in (None, ""):
+        return "NA"
+    number = float(value)
+    if digits == 0:
+        return str(int(round(number)))
+    return f"{number:.{digits}f}"
 
 
 def _scatter(

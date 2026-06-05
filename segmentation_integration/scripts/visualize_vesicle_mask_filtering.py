@@ -102,8 +102,8 @@ def render_mask_filter_qc(
         )
         render_mask_metrics_png(
             micrograph_path=micrograph_path,
-            output_path=output_dir / f"{uid}_filtered_mask_metrics.png",
-            masks=filtered_masks,
+            output_path=output_dir / f"{uid}_found_mask_metrics.png",
+            masks=found_masks,
             downsample=downsample,
             title=f"uid {uid}" + (f" {micrograph_path.name}" if micrograph_path is not None else ""),
             contrast_percentiles=contrast_percentiles,

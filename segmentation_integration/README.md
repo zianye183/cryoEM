@@ -87,6 +87,8 @@ The shell script runs Vesicle Picker `find_vesicles.py`, Vesicle Picker
 `filter_vesicles.py`, upstream found-vs-filtered mask QC, standalone mask
 visualization, and then this repo's CryoSPARC particle filter. The upstream QC
 PNGs and mask stats are produced under `filtered_particles/mask_filter_qc/`.
+Per-vesicle metric QC is rendered for all found segmentations before filtering
+as `{uid}_found_mask_metrics.png`.
 The final membrane-band mask PNGs are produced under `filtered_particles/masks/`.
 
 To render upstream QC from existing Vesicle Picker outputs:

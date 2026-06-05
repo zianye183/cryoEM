@@ -34,8 +34,14 @@ python segmentation_integration/scripts/prepare_vesicle_picker_run.py \
   --dataset raw \
   --local-micrographs \
   --output-dir /path/to/segmentation_run \
+  --segmentation-preset default \
   --filter-output-dir /path/to/segmentation_run/filtered_particles
 ```
+
+Use `--segmentation-preset recall_heavy` to generate a SAM recall-focused
+`find_vesicles.ini` with `points_per_side = 64`, `pred_iou_thresh = 0.8`,
+`stability_score_thresh = 0.8`, `crop_n_layers = 2`, and
+`crop_nms_thresh = 0.5`.
 
 Use `--dataset draco` for the Draco-denoised micrographs. The preset locates
 the one `.cs` and one `.csg` file in the corresponding CryoSPARC exported

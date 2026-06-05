@@ -113,6 +113,38 @@ class VesiclePickerInvocationTests(unittest.TestCase):
         self.assertLess(script.index("run_local_vesicle_picker.py"), script.index("visualize_vesicle_masks.py"))
         self.assertLess(script.index("visualize_vesicle_masks.py"), script.index("filter_cryosparc_picks_by_vesicle_masks.py"))
 
+    def test_prepare_run_can_use_recall_heavy_segmentation_preset(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            vesicle_picker_dir = root / "vesicle-picker"
+            vesicle_picker_dir.mkdir()
+            output_dir = root / "run"
+
+            summary = prepare_vesicle_picker_run(
+                output_dir=output_dir,
+                vesicle_picker_dir=vesicle_picker_dir,
+                csparc_login=Path("/cluster/csparc_login.ini"),
+                project_id="P1",
+                workspace_id="W2",
+                job_id="J3",
+                job_type="curate",
+                model_weights_path=Path("/cluster/sam_vit_h_4b8939.pth"),
+                particles_cs=Path("/exports/particles.cs"),
+                particles_csg=Path("/exports/particles.csg"),
+                micrographs_dir=Path("/exports/micrographs"),
+                filter_output_dir=Path("/outputs/filtered_particles"),
+                segmentation_preset="recall_heavy",
+            )
+
+            find_ini = (output_dir / "parameters" / "find_vesicles.ini").read_text()
+
+        self.assertEqual(summary["segmentation_preset"], "recall_heavy")
+        self.assertIn("points_per_side = 64", find_ini)
+        self.assertIn("pred_iou_thresh = 0.8", find_ini)
+        self.assertIn("stability_score_thresh = 0.8", find_ini)
+        self.assertIn("crop_n_layers = 2", find_ini)
+        self.assertIn("crop_nms_thresh = 0.5", find_ini)
+
 
 if __name__ == "__main__":
     unittest.main()

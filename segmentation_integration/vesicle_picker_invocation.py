@@ -38,6 +38,18 @@ PRESTIN_SETTINGS = {
 }
 
 
+SEGMENTATION_PRESETS = {
+    "default": {},
+    "recall_heavy": {
+        "points_per_side": "64",
+        "pred_iou_thresh": "0.8",
+        "stability_score_thresh": "0.8",
+        "crop_n_layers": "2",
+        "crop_nms_thresh": "0.5",
+    },
+}
+
+
 def prepare_vesicle_picker_run(
     *,
     output_dir: Path,
@@ -53,8 +65,10 @@ def prepare_vesicle_picker_run(
     micrographs_dir: Path,
     filter_output_dir: Path,
     local_micrographs: bool = False,
+    segmentation_preset: str = "default",
 ) -> dict[str, str]:
     """Write Vesicle Picker configs and a runnable end-to-end shell script."""
+    settings = settings_for_segmentation_preset(segmentation_preset)
     output_dir = Path(output_dir)
     parameters_dir = output_dir / "parameters"
     found_masks_dir = output_dir / "vesicle_masks_found"
@@ -72,12 +86,14 @@ def prepare_vesicle_picker_run(
             render_local_find_vesicles_ini(
                 model_weights_path=model_weights_path,
                 output_directory=found_masks_dir,
+                settings=settings,
             )
         )
         filter_path.write_text(
             render_local_filter_vesicles_ini(
                 input_directory=found_masks_dir,
                 output_directory=filtered_masks_dir,
+                settings=settings,
             )
         )
     else:
@@ -89,6 +105,7 @@ def prepare_vesicle_picker_run(
                 job_type=job_type,
                 model_weights_path=model_weights_path,
                 output_directory=found_masks_dir,
+                settings=settings,
             )
         )
         filter_path.write_text(
@@ -99,6 +116,7 @@ def prepare_vesicle_picker_run(
                 job_type=job_type,
                 input_directory=found_masks_dir,
                 output_directory=filtered_masks_dir,
+                settings=settings,
             )
         )
     script_path.write_text(
@@ -113,6 +131,7 @@ def prepare_vesicle_picker_run(
             filter_output_dir=filter_output_dir,
             workspace_id=workspace_id or "local",
             local_micrographs=local_micrographs,
+            settings=settings,
         )
     )
     script_path.chmod(script_path.stat().st_mode | stat.S_IXUSR)
@@ -123,6 +142,7 @@ def prepare_vesicle_picker_run(
         "found_masks_dir": str(found_masks_dir),
         "filtered_masks_dir": str(filtered_masks_dir),
         "filter_output_dir": str(filter_output_dir),
+        "segmentation_preset": segmentation_preset,
     }
 
 
@@ -143,6 +163,7 @@ def prepare_vesicle_picker_run_for_dataset(
     particles_csg: Path | None = None,
     micrographs_dir: Path | None = None,
     vesicle_picker_dir: Path | None = None,
+    segmentation_preset: str = "default",
 ) -> dict[str, str]:
     """Write Vesicle Picker configs using a named Prestin dataset preset."""
     paths = resolve_standard_paths(
@@ -167,6 +188,7 @@ def prepare_vesicle_picker_run_for_dataset(
         micrographs_dir=paths.micrographs_dir,
         filter_output_dir=filter_output_dir,
         local_micrographs=local_micrographs,
+        segmentation_preset=segmentation_preset,
     )
     summary.update(
         {
@@ -186,29 +208,31 @@ def render_local_find_vesicles_ini(
     *,
     model_weights_path: Path,
     output_directory: Path,
+    settings: dict[str, str] | None = None,
 ) -> str:
+    settings = PRESTIN_SETTINGS if settings is None else settings
     return f"""[general]
-psize = {PRESTIN_SETTINGS["psize"]}
-downsample = {PRESTIN_SETTINGS["downsample"]}
+psize = {settings["psize"]}
+downsample = {settings["downsample"]}
 
 [preprocessing]
-lowpass_mode = {PRESTIN_SETTINGS["lowpass_mode"]}
-d = {PRESTIN_SETTINGS["d"]}
-sigmaColor = {PRESTIN_SETTINGS["sigmaColor"]}
-sigmaSpace = {PRESTIN_SETTINGS["sigmaSpace"]}
+lowpass_mode = {settings["lowpass_mode"]}
+d = {settings["d"]}
+sigmaColor = {settings["sigmaColor"]}
+sigmaSpace = {settings["sigmaSpace"]}
 
 [segmentation]
 model_weights_path = {model_weights_path}
-model_type = {PRESTIN_SETTINGS["model_type"]}
-device = {PRESTIN_SETTINGS["device"]}
-points_per_side = {PRESTIN_SETTINGS["points_per_side"]}
-points_per_batch = {PRESTIN_SETTINGS["points_per_batch"]}
-pred_iou_thresh = {PRESTIN_SETTINGS["pred_iou_thresh"]}
-stability_score_thresh = {PRESTIN_SETTINGS["stability_score_thresh"]}
-crop_n_layers = {PRESTIN_SETTINGS["crop_n_layers"]}
-crop_n_points_downscale_factor = {PRESTIN_SETTINGS["crop_n_points_downscale_factor"]}
-crop_nms_thresh = {PRESTIN_SETTINGS["crop_nms_thresh"]}
-min_mask_region_area = {PRESTIN_SETTINGS["min_mask_region_area"]}
+model_type = {settings["model_type"]}
+device = {settings["device"]}
+points_per_side = {settings["points_per_side"]}
+points_per_batch = {settings["points_per_batch"]}
+pred_iou_thresh = {settings["pred_iou_thresh"]}
+stability_score_thresh = {settings["stability_score_thresh"]}
+crop_n_layers = {settings["crop_n_layers"]}
+crop_n_points_downscale_factor = {settings["crop_n_points_downscale_factor"]}
+crop_nms_thresh = {settings["crop_nms_thresh"]}
+min_mask_region_area = {settings["min_mask_region_area"]}
 
 [postprocessing]
 functions = [postprocess.find_mask_intensity, postprocess.find_contour, postprocess.find_roundness, postprocess.fit_ellipse]
@@ -222,21 +246,23 @@ def render_local_filter_vesicles_ini(
     *,
     input_directory: Path,
     output_directory: Path,
+    settings: dict[str, str] | None = None,
 ) -> str:
+    settings = PRESTIN_SETTINGS if settings is None else settings
     return f"""[input]
 directory = {ensure_trailing_slash(input_directory)}
 
 [general]
-psize = {PRESTIN_SETTINGS["psize"]}
-downsample = {PRESTIN_SETTINGS["downsample"]}
+psize = {settings["psize"]}
+downsample = {settings["downsample"]}
 
 [area]
-min = {PRESTIN_SETTINGS["area_min"]}
-max = {PRESTIN_SETTINGS["area_max"]}
+min = {settings["area_min"]}
+max = {settings["area_max"]}
 
 [roundness]
-min = {PRESTIN_SETTINGS["roundness_min"]}
-max = {PRESTIN_SETTINGS["roundness_max"]}
+min = {settings["roundness_min"]}
+max = {settings["roundness_max"]}
 
 [output]
 directory = {ensure_trailing_slash(output_directory)}
@@ -251,7 +277,9 @@ def render_find_vesicles_ini(
     job_type: str,
     model_weights_path: Path,
     output_directory: Path,
+    settings: dict[str, str] | None = None,
 ) -> str:
+    settings = PRESTIN_SETTINGS if settings is None else settings
     return f"""[csparc_input]
 PID = {project_id}
 JID = {job_id}
@@ -259,27 +287,27 @@ type = {job_type}
 login = {csparc_login}
 
 [general]
-psize = {PRESTIN_SETTINGS["psize"]}
-downsample = {PRESTIN_SETTINGS["downsample"]}
+psize = {settings["psize"]}
+downsample = {settings["downsample"]}
 
 [preprocessing]
-lowpass_mode = {PRESTIN_SETTINGS["lowpass_mode"]}
-d = {PRESTIN_SETTINGS["d"]}
-sigmaColor = {PRESTIN_SETTINGS["sigmaColor"]}
-sigmaSpace = {PRESTIN_SETTINGS["sigmaSpace"]}
+lowpass_mode = {settings["lowpass_mode"]}
+d = {settings["d"]}
+sigmaColor = {settings["sigmaColor"]}
+sigmaSpace = {settings["sigmaSpace"]}
 
 [segmentation]
 model_weights_path = {model_weights_path}
-model_type = {PRESTIN_SETTINGS["model_type"]}
-device = {PRESTIN_SETTINGS["device"]}
-points_per_side = {PRESTIN_SETTINGS["points_per_side"]}
-points_per_batch = {PRESTIN_SETTINGS["points_per_batch"]}
-pred_iou_thresh = {PRESTIN_SETTINGS["pred_iou_thresh"]}
-stability_score_thresh = {PRESTIN_SETTINGS["stability_score_thresh"]}
-crop_n_layers = {PRESTIN_SETTINGS["crop_n_layers"]}
-crop_n_points_downscale_factor = {PRESTIN_SETTINGS["crop_n_points_downscale_factor"]}
-crop_nms_thresh = {PRESTIN_SETTINGS["crop_nms_thresh"]}
-min_mask_region_area = {PRESTIN_SETTINGS["min_mask_region_area"]}
+model_type = {settings["model_type"]}
+device = {settings["device"]}
+points_per_side = {settings["points_per_side"]}
+points_per_batch = {settings["points_per_batch"]}
+pred_iou_thresh = {settings["pred_iou_thresh"]}
+stability_score_thresh = {settings["stability_score_thresh"]}
+crop_n_layers = {settings["crop_n_layers"]}
+crop_n_points_downscale_factor = {settings["crop_n_points_downscale_factor"]}
+crop_nms_thresh = {settings["crop_nms_thresh"]}
+min_mask_region_area = {settings["min_mask_region_area"]}
 
 [postprocessing]
 functions = [postprocess.find_mask_intensity, postprocess.find_contour, postprocess.find_roundness, postprocess.fit_ellipse]
@@ -297,7 +325,9 @@ def render_filter_vesicles_ini(
     job_type: str,
     input_directory: Path,
     output_directory: Path,
+    settings: dict[str, str] | None = None,
 ) -> str:
+    settings = PRESTIN_SETTINGS if settings is None else settings
     return f"""[csparc_input]
 PID = {project_id}
 JID = {job_id}
@@ -308,16 +338,16 @@ login = {csparc_login}
 directory = {ensure_trailing_slash(input_directory)}
 
 [general]
-psize = {PRESTIN_SETTINGS["psize"]}
-downsample = {PRESTIN_SETTINGS["downsample"]}
+psize = {settings["psize"]}
+downsample = {settings["downsample"]}
 
 [area]
-min = {PRESTIN_SETTINGS["area_min"]}
-max = {PRESTIN_SETTINGS["area_max"]}
+min = {settings["area_min"]}
+max = {settings["area_max"]}
 
 [roundness]
-min = {PRESTIN_SETTINGS["roundness_min"]}
-max = {PRESTIN_SETTINGS["roundness_max"]}
+min = {settings["roundness_min"]}
+max = {settings["roundness_max"]}
 
 [output]
 directory = {ensure_trailing_slash(output_directory)}
@@ -336,7 +366,9 @@ def render_end_to_end_script(
     filter_output_dir: Path,
     workspace_id: str,
     local_micrographs: bool = False,
+    settings: dict[str, str] | None = None,
 ) -> str:
+    settings = PRESTIN_SETTINGS if settings is None else settings
     visualize_command = [
         "python",
         "segmentation_integration/scripts/visualize_vesicle_masks.py",
@@ -347,11 +379,11 @@ def render_end_to_end_script(
         "--output-dir",
         filter_output_dir / "masks",
         "--psize-a",
-        PRESTIN_SETTINGS["psize"],
+        settings["psize"],
         "--downsample",
-        PRESTIN_SETTINGS["downsample"],
+        settings["downsample"],
         "--membrane-band-a",
-        PRESTIN_SETTINGS["membrane_band_a"],
+        settings["membrane_band_a"],
     ]
     filter_command = [
         "python",
@@ -367,11 +399,11 @@ def render_end_to_end_script(
         "--output-dir",
         filter_output_dir,
         "--psize-a",
-        PRESTIN_SETTINGS["psize"],
+        settings["psize"],
         "--downsample",
-        PRESTIN_SETTINGS["downsample"],
+        settings["downsample"],
         "--membrane-band-a",
-        PRESTIN_SETTINGS["membrane_band_a"],
+        settings["membrane_band_a"],
         "--skip-mask-pngs",
     ]
     upstream_qc_command = [
@@ -388,7 +420,7 @@ def render_end_to_end_script(
         "--micrographs-dir",
         micrographs_dir,
         "--downsample",
-        PRESTIN_SETTINGS["downsample"],
+        settings["downsample"],
     ]
     local_vesicle_command = [
         "python",
@@ -444,3 +476,16 @@ def ensure_trailing_slash(path: Path) -> str:
 
 def quote_command(parts: list[object]) -> str:
     return " ".join(shlex.quote(str(part)) for part in parts)
+
+
+def settings_for_segmentation_preset(segmentation_preset: str) -> dict[str, str]:
+    if segmentation_preset not in SEGMENTATION_PRESETS:
+        choices = ", ".join(sorted(SEGMENTATION_PRESETS))
+        raise ValueError(f"Unknown segmentation preset {segmentation_preset!r}; choices: {choices}")
+    settings = dict(PRESTIN_SETTINGS)
+    settings.update(SEGMENTATION_PRESETS[segmentation_preset])
+    return settings
+
+
+def segmentation_preset_choices() -> list[str]:
+    return sorted(SEGMENTATION_PRESETS)

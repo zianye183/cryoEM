@@ -17,6 +17,7 @@ from segmentation_integration.vesicle_picker_invocation import (
     DEFAULT_MODEL_WEIGHTS_PATH,
     prepare_vesicle_picker_run,
     prepare_vesicle_picker_run_for_dataset,
+    segmentation_preset_choices,
 )
 
 
@@ -36,6 +37,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--job-id")
     parser.add_argument("--job-type", choices=["curate", "patch_ctf"], default="curate")
     parser.add_argument("--model-weights-path", type=Path, default=DEFAULT_MODEL_WEIGHTS_PATH)
+    parser.add_argument(
+        "--segmentation-preset",
+        choices=segmentation_preset_choices(),
+        default="default",
+        help="SAM parameter preset for find_vesicles.ini generation.",
+    )
     parser.add_argument("--particle-export-dir", type=Path, help="Override the preset particle export directory.")
     parser.add_argument("--particles-cs", type=Path, help="Override the preset particle .cs file.")
     parser.add_argument("--particles-csg", type=Path, help="Override the preset particle .csg file.")
@@ -74,6 +81,7 @@ def main() -> None:
             job_id=args.job_id,
             job_type=args.job_type,
             model_weights_path=args.model_weights_path,
+            segmentation_preset=args.segmentation_preset,
             particles_cs=args.particles_cs,
             particles_csg=args.particles_csg,
             micrographs_dir=args.micrographs_dir,
@@ -91,6 +99,7 @@ def main() -> None:
             job_id=args.job_id,
             job_type=args.job_type,
             model_weights_path=args.model_weights_path,
+            segmentation_preset=args.segmentation_preset,
             particles_cs=args.particles_cs,
             particles_csg=args.particles_csg,
             micrographs_dir=args.micrographs_dir,

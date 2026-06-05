@@ -1,6 +1,7 @@
 import pickle
 import tempfile
 import unittest
+from io import StringIO
 from pathlib import Path
 
 import numpy as np
@@ -170,6 +171,30 @@ class UpstreamMaskQcTests(unittest.TestCase):
         self.assertIn("uid\tstage\tmask_index\tstatus\treject_reasons", stats)
         self.assertIn("7\tfound\t0\trejected\tarea_min", stats)
         self.assertIn("7\tfound\t1\tkept\t", stats)
+
+    def test_render_mask_filter_qc_emits_per_micrograph_progress(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            found_dir = root / "found"
+            filtered_dir = root / "filtered"
+            output_dir = root / "qc"
+            found_dir.mkdir()
+            filtered_dir.mkdir()
+            write_mask(found_dir / "7_vesicles.pkl", uid=7, area=36, roundness=0.5)
+            write_mask(filtered_dir / "7_vesicles_filtered.pkl", uid=7, area=36, roundness=0.5)
+            stream = StringIO()
+
+            render_mask_filter_qc(
+                found_mask_dir=found_dir,
+                filtered_mask_dir=filtered_dir,
+                output_dir=output_dir,
+                max_micrographs=0,
+                progress_stream=stream,
+            )
+
+        lines = stream.getvalue().strip().splitlines()
+        self.assertEqual(lines[0], "[mask filter qc] 1/1 uid=7 status=start")
+        self.assertRegex(lines[1], r"^\[mask filter qc\] 1/1 uid=7 status=done found=1 filtered=1 elapsed=\d+\.\d{2}s$")
 
 
 if __name__ == "__main__":

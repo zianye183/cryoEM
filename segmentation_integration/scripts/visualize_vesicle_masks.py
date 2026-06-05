@@ -7,6 +7,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from time import monotonic
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -39,6 +40,12 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help="Maximum mask previews to render; 0 means all micrographs with masks.",
     )
+    parser.add_argument(
+        "--progress-every",
+        type=int,
+        default=1,
+        help="Write progress every N micrographs; 0 disables progress lines.",
+    )
     args = parser.parse_args()
     if args.dataset is None and args.particles_cs is None:
         parser.error("--dataset is required unless --particles-cs is provided")
@@ -54,6 +61,8 @@ def render_mask_previews(
     downsample: int,
     membrane_band_a: float,
     max_masks: int,
+    progress_every: int = 1,
+    progress_stream=sys.stderr,
 ) -> dict[str, int]:
     """Render one standalone membrane-band PNG per UID available in particles."""
     particles = load_particles_cs(particles_cs)
@@ -67,16 +76,49 @@ def render_mask_previews(
 
     rendered = 0
     missing = 0
-    for uid, micrograph_path in sorted(uid_to_path.items()):
+    items = sorted(uid_to_path.items())
+    total = len(items)
+    for index, (uid, micrograph_path) in enumerate(items, start=1):
         if max_masks > 0 and rendered >= max_masks:
             break
+        item_started_at = monotonic()
+        if should_emit_progress(index, progress_every):
+            emit_progress(
+                progress_stream,
+                index=index,
+                total=total,
+                uid=uid,
+                micrograph_path=micrograph_path,
+                status="start",
+            )
         mask_path = mask_path_for_uid(vesicle_mask_dir, uid)
         if not mask_path.exists():
             missing += 1
+            if should_emit_progress(index, progress_every):
+                emit_progress(
+                    progress_stream,
+                    index=index,
+                    total=total,
+                    uid=uid,
+                    micrograph_path=micrograph_path,
+                    status="missing",
+                    elapsed_seconds=monotonic() - item_started_at,
+                )
             continue
         masks = load_vesicle_masks(mask_path)
         if not masks:
             missing += 1
+            if should_emit_progress(index, progress_every):
+                emit_progress(
+                    progress_stream,
+                    index=index,
+                    total=total,
+                    uid=uid,
+                    micrograph_path=micrograph_path,
+                    status="empty",
+                    masks=0,
+                    elapsed_seconds=monotonic() - item_started_at,
+                )
             continue
         band = build_membrane_band(masks, radius_px)
         stem = Path(micrograph_path).stem
@@ -86,7 +128,47 @@ def render_mask_previews(
             title=f"{stem} membrane band",
         )
         rendered += 1
+        if should_emit_progress(index, progress_every):
+            emit_progress(
+                progress_stream,
+                index=index,
+                total=total,
+                uid=uid,
+                micrograph_path=micrograph_path,
+                status="done",
+                masks=len(masks),
+                elapsed_seconds=monotonic() - item_started_at,
+            )
     return {"rendered_masks": rendered, "missing_masks": missing}
+
+
+def should_emit_progress(index: int, progress_every: int) -> bool:
+    return progress_every > 0 and index % progress_every == 0
+
+
+def emit_progress(
+    stream,
+    *,
+    index: int,
+    total: int,
+    uid: int,
+    micrograph_path: str,
+    status: str,
+    masks: int | None = None,
+    elapsed_seconds: float | None = None,
+) -> None:
+    parts = [
+        "[mask preview]",
+        f"{index}/{total}",
+        f"uid={uid}",
+        f"status={status}",
+    ]
+    if masks is not None:
+        parts.append(f"masks={masks}")
+    if elapsed_seconds is not None:
+        parts.append(f"elapsed={elapsed_seconds:.2f}s")
+    parts.append(f"mic={Path(micrograph_path).name}")
+    print(" ".join(parts), file=stream, flush=True)
 
 
 def main() -> None:
@@ -106,6 +188,7 @@ def main() -> None:
         downsample=args.downsample,
         membrane_band_a=args.membrane_band_a,
         max_masks=args.max_masks,
+        progress_every=args.progress_every,
     )
     print(json.dumps(summary, indent=2))
 

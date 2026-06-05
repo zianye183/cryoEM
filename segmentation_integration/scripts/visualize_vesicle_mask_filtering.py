@@ -8,6 +8,7 @@ import configparser
 import json
 import sys
 from pathlib import Path
+from time import monotonic
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -61,6 +62,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--contrast-percentiles", default="1,99")
     parser.add_argument("--filter-parameters", type=Path, help="Optional filter_vesicles.ini for found-mask reject reasons.")
     parser.add_argument("--max-micrographs", type=int, default=0, help="Maximum UIDs to render; 0 means all.")
+    parser.add_argument(
+        "--progress-every",
+        type=int,
+        default=1,
+        help="Write progress every N micrographs; 0 disables progress lines.",
+    )
     args = parser.parse_args()
     if (args.particles_cs is None) != (args.micrographs_dir is None):
         parser.error("--particles-cs and --micrographs-dir must be provided together")
@@ -79,6 +86,8 @@ def render_mask_filter_qc(
     display_downsample: int = 4,
     contrast_percentiles: tuple[float, float] = (1, 99),
     filter_parameters: Path | None = None,
+    progress_every: int = 1,
+    progress_stream=sys.stderr,
 ) -> dict[str, int]:
     output_dir.mkdir(parents=True, exist_ok=True)
     uid_to_micrograph = micrograph_paths_by_uid(particles_cs, micrographs_dir) if particles_cs and micrographs_dir else {}
@@ -88,10 +97,15 @@ def render_mask_filter_qc(
     missing_filtered = 0
     found_kept = 0
     found_rejected = 0
-    for found_path in sorted(found_mask_dir.glob("*_vesicles.pkl")):
-        if max_micrographs > 0 and rendered >= max_micrographs:
-            break
+    found_paths = sorted(found_mask_dir.glob("*_vesicles.pkl"))
+    if max_micrographs > 0:
+        found_paths = found_paths[:max_micrographs]
+    total = len(found_paths)
+    for index, found_path in enumerate(found_paths, start=1):
+        item_started_at = monotonic()
         uid = uid_from_found_mask_path(found_path)
+        if should_emit_progress(index, progress_every):
+            emit_progress(progress_stream, index=index, total=total, uid=uid, status="start")
         filtered_path = filtered_mask_dir / f"{uid}_vesicles_filtered.pkl"
         found_masks = load_vesicle_masks(found_path)
         filtered_masks = load_vesicle_masks(filtered_path) if filtered_path.exists() else []
@@ -107,6 +121,17 @@ def render_mask_filter_qc(
         stats_rows.extend(mask_stats_rows(uid, "found", found_masks, classified))
         stats_rows.extend(mask_stats_rows(uid, "filtered", filtered_masks))
         if not found_masks:
+            if should_emit_progress(index, progress_every):
+                emit_progress(
+                    progress_stream,
+                    index=index,
+                    total=total,
+                    uid=uid,
+                    status="empty",
+                    found_masks=0,
+                    filtered_masks=len(filtered_masks),
+                    elapsed_seconds=monotonic() - item_started_at,
+                )
             continue
         render_mask_filter_debug_png(
             micrograph_path=micrograph_path,
@@ -141,6 +166,17 @@ def render_mask_filter_qc(
                 filtered_count=len(filtered_masks),
             )
         rendered += 1
+        if should_emit_progress(index, progress_every):
+            emit_progress(
+                progress_stream,
+                index=index,
+                total=total,
+                uid=uid,
+                status="done",
+                found_masks=len(found_masks),
+                filtered_masks=len(filtered_masks),
+                elapsed_seconds=monotonic() - item_started_at,
+            )
     write_stats_tsv(output_dir / "mask_filter_stats.tsv", stats_rows)
     return {
         "rendered_comparisons": rendered,
@@ -149,6 +185,36 @@ def render_mask_filter_qc(
         "found_masks_kept": found_kept,
         "found_masks_rejected": found_rejected,
     }
+
+
+def should_emit_progress(index: int, progress_every: int) -> bool:
+    return progress_every > 0 and index % progress_every == 0
+
+
+def emit_progress(
+    stream,
+    *,
+    index: int,
+    total: int,
+    uid: int,
+    status: str,
+    found_masks: int | None = None,
+    filtered_masks: int | None = None,
+    elapsed_seconds: float | None = None,
+) -> None:
+    parts = [
+        "[mask filter qc]",
+        f"{index}/{total}",
+        f"uid={uid}",
+        f"status={status}",
+    ]
+    if found_masks is not None:
+        parts.append(f"found={found_masks}")
+    if filtered_masks is not None:
+        parts.append(f"filtered={filtered_masks}")
+    if elapsed_seconds is not None:
+        parts.append(f"elapsed={elapsed_seconds:.2f}s")
+    print(" ".join(parts), file=stream, flush=True)
 
 
 def uid_from_found_mask_path(path: Path) -> int:
@@ -338,6 +404,7 @@ def main() -> None:
         display_downsample=args.display_downsample,
         contrast_percentiles=contrast,
         filter_parameters=args.filter_parameters,
+        progress_every=args.progress_every,
     )
     print(json.dumps(summary, indent=2))
 

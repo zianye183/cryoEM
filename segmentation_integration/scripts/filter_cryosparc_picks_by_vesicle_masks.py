@@ -48,6 +48,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Do not render standalone membrane-band mask PNGs during filtering.",
     )
+    parser.add_argument(
+        "--progress-every",
+        type=int,
+        default=1,
+        help="Write progress every N micrographs; 0 disables progress lines.",
+    )
     args = parser.parse_args()
     if args.dataset is None:
         missing = [name for name in ("particles_cs", "particles_csg", "micrographs_dir") if getattr(args, name) is None]
@@ -84,6 +90,7 @@ def main() -> None:
         psize_a=args.psize_a,
         downsample=args.downsample,
         membrane_band_a=args.membrane_band_a,
+        progress_every=args.progress_every,
     )
 
     args.output_dir.mkdir(parents=True, exist_ok=True)

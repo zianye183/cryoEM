@@ -1,6 +1,7 @@
 import pickle
 import tempfile
 import unittest
+from io import StringIO
 from pathlib import Path
 
 import numpy as np
@@ -95,6 +96,33 @@ class VesicleFilteringTests(unittest.TestCase):
         self.assertEqual(result.reason_counts["outside_membrane_band"], 1)
         self.assertEqual(result.reason_counts["out_of_bounds"], 1)
         self.assertEqual(result.reason_counts["missing_mask"], 1)
+
+    def test_filter_particles_by_masks_emits_per_micrograph_progress(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            mask_dir = Path(tmp)
+            write_prime_mask(mask_dir / "7_vesicles_filtered.pkl")
+            stream = StringIO()
+
+            filter_particles_by_masks(
+                make_particles(),
+                vesicle_mask_dir=mask_dir,
+                psize_a=1.0,
+                downsample=10,
+                membrane_band_a=10.0,
+                progress_stream=stream,
+            )
+
+        lines = stream.getvalue().strip().splitlines()
+        self.assertEqual(lines[0], "[particle filter] 1/2 uid=7 status=start mic=mic_a.mrc")
+        self.assertRegex(
+            lines[1],
+            r"^\[particle filter\] 1/2 uid=7 status=done kept=1 rejected=2 elapsed=\d+\.\d{2}s mic=mic_a.mrc$",
+        )
+        self.assertEqual(lines[2], "[particle filter] 2/2 uid=8 status=start mic=mic_b.mrc")
+        self.assertRegex(
+            lines[3],
+            r"^\[particle filter\] 2/2 uid=8 status=missing_mask kept=0 rejected=1 elapsed=\d+\.\d{2}s mic=mic_b.mrc$",
+        )
 
 
 if __name__ == "__main__":

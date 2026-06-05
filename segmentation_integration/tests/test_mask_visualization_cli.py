@@ -1,6 +1,7 @@
 import pickle
 import tempfile
 import unittest
+from io import StringIO
 from pathlib import Path
 
 import numpy as np
@@ -67,6 +68,32 @@ class MaskVisualizationCliTests(unittest.TestCase):
 
             self.assertEqual(summary["rendered_masks"], 1)
             self.assertGreater(out_path.stat().st_size, 0)
+
+    def test_render_mask_previews_emits_per_micrograph_progress(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            particles_cs = root / "particles.cs"
+            mask_dir = root / "masks"
+            output_dir = root / "mask_previews"
+            mask_dir.mkdir()
+            write_particles_cs(particles_cs)
+            write_mask(mask_dir / "7_vesicles_filtered.pkl")
+            stream = StringIO()
+
+            render_mask_previews(
+                particles_cs=particles_cs,
+                vesicle_mask_dir=mask_dir,
+                output_dir=output_dir,
+                psize_a=1.0,
+                downsample=10,
+                membrane_band_a=10.0,
+                max_masks=0,
+                progress_stream=stream,
+            )
+
+        lines = stream.getvalue().strip().splitlines()
+        self.assertEqual(lines[0], "[mask preview] 1/1 uid=7 status=start mic=mic_a.mrc")
+        self.assertRegex(lines[1], r"^\[mask preview\] 1/1 uid=7 status=done masks=1 elapsed=\d+\.\d{2}s mic=mic_a.mrc$")
 
 
 if __name__ == "__main__":

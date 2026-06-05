@@ -384,6 +384,8 @@ def render_end_to_end_script(
         settings["downsample"],
         "--membrane-band-a",
         settings["membrane_band_a"],
+        "--progress-every",
+        "1",
     ]
     filter_command = [
         "python",
@@ -405,6 +407,8 @@ def render_end_to_end_script(
         "--membrane-band-a",
         settings["membrane_band_a"],
         "--skip-mask-pngs",
+        "--progress-every",
+        "1",
     ]
     upstream_qc_command = [
         "python",
@@ -421,6 +425,8 @@ def render_end_to_end_script(
         micrographs_dir,
         "--downsample",
         settings["downsample"],
+        "--progress-every",
+        "1",
     ]
     local_vesicle_command = [
         "python",

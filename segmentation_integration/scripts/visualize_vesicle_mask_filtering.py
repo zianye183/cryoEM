@@ -15,6 +15,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import numpy as np
+from scipy import ndimage
 
 from segmentation_integration.cryosparc_io import (
     build_micrograph_index,
@@ -22,6 +23,7 @@ from segmentation_integration.cryosparc_io import (
     load_particles_cs,
     resolve_micrograph_path,
 )
+from segmentation_integration.mrc_io import read_mode2_mrc
 from segmentation_integration.vesicle_masks import load_vesicle_masks
 from segmentation_integration.visualization import (
     render_mask_comparison_png,
@@ -30,7 +32,21 @@ from segmentation_integration.visualization import (
 )
 
 
-STATS_FIELDS = ("area", "roundness", "average_radius_A", "semi_minor_A", "semi_major_A")
+STATS_FIELDS = (
+    "area",
+    "roundness",
+    "average_radius_A",
+    "semi_minor_A",
+    "semi_major_A",
+    "interior_mean",
+    "membrane_mean",
+    "local_bg_mean",
+    "ring_contrast",
+    "interior_contrast",
+    "interior_std",
+    "membrane_std",
+    "local_bg_std",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -81,6 +97,10 @@ def render_mask_filter_qc(
         filtered_masks = load_vesicle_masks(filtered_path) if filtered_path.exists() else []
         if not filtered_path.exists():
             missing_filtered += 1
+        micrograph_path = uid_to_micrograph.get(uid)
+        if micrograph_path is not None:
+            add_density_metrics(found_masks, micrograph_path, downsample)
+            add_density_metrics(filtered_masks, micrograph_path, downsample)
         classified = classify_masks(found_masks, rules)
         found_kept += sum(1 for item in classified if not item["reject_reasons"])
         found_rejected += sum(1 for item in classified if item["reject_reasons"])
@@ -88,7 +108,6 @@ def render_mask_filter_qc(
         stats_rows.extend(mask_stats_rows(uid, "filtered", filtered_masks))
         if not found_masks:
             continue
-        micrograph_path = uid_to_micrograph.get(uid)
         render_mask_filter_debug_png(
             micrograph_path=micrograph_path,
             output_path=output_dir / f"{uid}_found_filter_debug.png",
@@ -210,6 +229,91 @@ def mask_stats_rows(
             row[field] = mask.get(field, "")
         rows.append(row)
     return rows
+
+
+def add_density_metrics(masks: list[dict[str, Any]], micrograph_path: Path, downsample: int) -> None:
+    if not masks:
+        return
+    image = normalize_micrograph(read_mode2_mrc(micrograph_path))
+    first_shape = np.asarray(masks[0]["segmentation"], dtype=bool).shape
+    grid = downsample_image_to_mask_grid(image, first_shape, downsample)
+    for mask in masks:
+        metrics = density_metrics_for_mask(np.asarray(mask["segmentation"], dtype=bool), grid)
+        mask.update(metrics)
+
+
+def normalize_micrograph(image: np.ndarray) -> np.ndarray:
+    finite = image[np.isfinite(image)]
+    if finite.size == 0:
+        raise ValueError("Micrograph has no finite pixels")
+    low, high = np.percentile(finite, (1, 99))
+    scale = high - low
+    if scale <= 0:
+        scale = float(np.std(finite)) or 1.0
+    return (image - float(np.median(finite))) / scale
+
+
+def downsample_image_to_mask_grid(image: np.ndarray, shape: tuple[int, int], downsample: int) -> np.ndarray:
+    if downsample <= 1:
+        return image[: shape[0], : shape[1]]
+    rows = min(shape[0], image.shape[0] // downsample)
+    cols = min(shape[1], image.shape[1] // downsample)
+    cropped = image[: rows * downsample, : cols * downsample]
+    grid = cropped.reshape(rows, downsample, cols, downsample).mean(axis=(1, 3))
+    if (rows, cols) == shape:
+        return grid
+    out = np.full(shape, np.nan, dtype=float)
+    out[:rows, :cols] = grid
+    return out
+
+
+def density_metrics_for_mask(segmentation: np.ndarray, image: np.ndarray) -> dict[str, float | str]:
+    if not segmentation.any():
+        return empty_density_metrics()
+    segmentation = segmentation & np.isfinite(image)
+    if not segmentation.any():
+        return empty_density_metrics()
+    eroded = ndimage.binary_erosion(segmentation, iterations=2)
+    interior = eroded if eroded.any() else segmentation
+    membrane = segmentation & ~eroded
+    if not membrane.any():
+        membrane = segmentation
+    near = ndimage.binary_dilation(segmentation, iterations=4)
+    gap = ndimage.binary_dilation(segmentation, iterations=1)
+    local_bg = near & ~gap & np.isfinite(image)
+    if not local_bg.any():
+        local_bg = ~segmentation & np.isfinite(image)
+    if not local_bg.any():
+        return empty_density_metrics()
+    interior_values = image[interior]
+    membrane_values = image[membrane]
+    bg_values = image[local_bg]
+    interior_mean = float(np.mean(interior_values))
+    membrane_mean = float(np.mean(membrane_values))
+    bg_mean = float(np.mean(bg_values))
+    return {
+        "interior_mean": interior_mean,
+        "membrane_mean": membrane_mean,
+        "local_bg_mean": bg_mean,
+        "ring_contrast": abs(membrane_mean - bg_mean),
+        "interior_contrast": abs(interior_mean - bg_mean),
+        "interior_std": float(np.std(interior_values)),
+        "membrane_std": float(np.std(membrane_values)),
+        "local_bg_std": float(np.std(bg_values)),
+    }
+
+
+def empty_density_metrics() -> dict[str, str]:
+    return {
+        "interior_mean": "",
+        "membrane_mean": "",
+        "local_bg_mean": "",
+        "ring_contrast": "",
+        "interior_contrast": "",
+        "interior_std": "",
+        "membrane_std": "",
+        "local_bg_std": "",
+    }
 
 
 def write_stats_tsv(path: Path, rows: list[dict[str, Any]]) -> None:

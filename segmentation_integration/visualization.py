@@ -344,8 +344,13 @@ def _annotate_mask_metrics(
     y = float(np.mean(rows)) * scale
     area = _format_metric(mask.get("area"))
     roundness = _format_metric(mask.get("roundness"), digits=2)
+    label = f"A={area}\nR={roundness}"
+    if mask.get("ring_contrast") not in (None, "") or mask.get("interior_contrast") not in (None, ""):
+        ring = _format_metric(mask.get("ring_contrast"), digits=2)
+        interior = _format_metric(mask.get("interior_contrast"), digits=2)
+        label = f"{label}\nRing={ring}\nIn={interior}"
     ax.annotate(
-        f"A={area}\nR={roundness}",
+        label,
         xy=(x, y),
         xytext=(4, 4),
         textcoords="offset points",

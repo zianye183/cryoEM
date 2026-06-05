@@ -100,6 +100,44 @@ class UpstreamMaskQcTests(unittest.TestCase):
         self.assertIn("7\tfound\t0\tkept\t\t36\t0.5", stats)
         self.assertIn("7\tfiltered\t0\toutput\t\t36\t0.5", stats)
 
+    def test_render_mask_filter_qc_adds_density_metrics_when_micrographs_available(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            found_dir = root / "found"
+            filtered_dir = root / "filtered"
+            micrographs_dir = root / "micrographs"
+            output_dir = root / "qc"
+            found_dir.mkdir()
+            filtered_dir.mkdir()
+            micrographs_dir.mkdir()
+            particles_cs = root / "particles.cs"
+            write_particles_cs(particles_cs)
+            image = np.zeros((10, 10), dtype=np.float32)
+            image[2:5, 2:5] = 10
+            image[3:4, 3:4] = 20
+            write_mode2_mrc_for_test(micrographs_dir / "mic_a.mrc", image)
+            write_mask(found_dir / "7_vesicles.pkl", uid=7, area=9, roundness=0.9)
+            write_mask(filtered_dir / "7_vesicles_filtered.pkl", uid=7, area=9, roundness=0.9)
+
+            render_mask_filter_qc(
+                found_mask_dir=found_dir,
+                filtered_mask_dir=filtered_dir,
+                output_dir=output_dir,
+                max_micrographs=0,
+                particles_cs=particles_cs,
+                micrographs_dir=micrographs_dir,
+                downsample=1,
+            )
+
+            stats = (output_dir / "mask_filter_stats.tsv").read_text()
+
+        self.assertIn("interior_mean", stats)
+        self.assertIn("membrane_mean", stats)
+        self.assertIn("local_bg_mean", stats)
+        self.assertIn("ring_contrast", stats)
+        self.assertIn("interior_contrast", stats)
+        self.assertIn("interior_std", stats)
+
     def test_render_mask_filter_qc_classifies_found_masks_with_reject_reasons(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

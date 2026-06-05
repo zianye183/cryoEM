@@ -30,9 +30,9 @@ PRESTIN_SETTINGS = {
     "crop_n_points_downscale_factor": "2",
     "crop_nms_thresh": "0.1",
     "min_mask_region_area": "100",
-    "area_min": "2.5e3",
-    "area_max": "1e5",
-    "roundness_min": "0.75",
+    "area_min": "1000",
+    "area_max": "18000",
+    "roundness_min": "0.82",
     "roundness_max": "1",
     "membrane_band_a": "40",
 }

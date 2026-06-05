@@ -100,8 +100,8 @@ def main() -> None:
     rejected_csg = args.output_dir / "rejected_particles.csg"
     write_cs(filtered_cs, result.kept)
     write_cs(rejected_cs, result.rejected)
-    patch_csg_cs_path(args.particles_csg, filtered_csg, args.particles_cs.name, filtered_cs)
-    patch_csg_cs_path(args.particles_csg, rejected_csg, args.particles_cs.name, rejected_cs)
+    patch_csg_cs_path(args.particles_csg, filtered_csg, args.particles_cs.name, csg_cs_reference_path(filtered_cs, args.particles_csg))
+    patch_csg_cs_path(args.particles_csg, rejected_csg, args.particles_cs.name, csg_cs_reference_path(rejected_cs, args.particles_csg))
     write_tsv(args.output_dir / "filter_summary.tsv", result.micrograph_rows)
     write_summary_json(
         args.output_dir / "filter_summary.json",
@@ -129,6 +129,25 @@ def main() -> None:
 
     print(f"Kept {len(result.kept)} particles; rejected {len(result.rejected)} particles.")
     print(f"Import filtered result group in CryoSPARC with: {filtered_csg}")
+
+
+def csg_cs_reference_path(cs_path: Path, particles_csg: Path) -> Path:
+    """Return the `.cs` reference path CryoSPARC should see inside an imported `.csg`."""
+    project_dir = cryosparc_project_dir_from_export_path(particles_csg)
+    if project_dir is None:
+        return cs_path
+    try:
+        return cs_path.relative_to(project_dir)
+    except ValueError:
+        return cs_path
+
+
+def cryosparc_project_dir_from_export_path(path: Path) -> Path | None:
+    parts = path.parts
+    for index in range(len(parts) - 1):
+        if parts[index : index + 2] == ("exports", "groups"):
+            return Path(*parts[:index])
+    return None
 
 
 def render_overlays(args: argparse.Namespace, particles: np.ndarray, result, low_high: tuple[float, float]) -> None:

@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 
 from segmentation_integration.filtering import filter_particles_by_masks, particle_mask_coordinate
+from segmentation_integration.scripts.filter_cryosparc_picks_by_vesicle_masks import csg_cs_reference_path
 from segmentation_integration.vesicle_masks import build_membrane_band, load_vesicle_masks
 
 
@@ -123,6 +124,15 @@ class VesicleFilteringTests(unittest.TestCase):
             lines[3],
             r"^\[particle filter\] 2/2 uid=8 status=missing_mask kept=0 rejected=1 elapsed=\d+\.\d{2}s mic=mic_b.mrc$",
         )
+
+    def test_csg_cs_reference_path_is_project_relative_for_project_exports(self) -> None:
+        project = Path("/nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin")
+        particles_csg = project / "exports/groups/J71_particles/J71_particles_exported.csg"
+        filtered_cs = project / "exports/groups/raw_fuller_filtered_particles/filtered_particles.cs"
+
+        reference = csg_cs_reference_path(filtered_cs, particles_csg)
+
+        self.assertEqual(reference, Path("exports/groups/raw_fuller_filtered_particles/filtered_particles.cs"))
 
 
 if __name__ == "__main__":

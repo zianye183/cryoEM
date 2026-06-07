@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,6 +27,9 @@ from segmentation_integration.cryosparc_io import (
 from segmentation_integration.mrc_io import read_mrc
 
 
+CRYOSPARC_UID_PREFIX_RE = re.compile(r"^0*(\d+)_")
+
+
 @dataclass(frozen=True)
 class MicrographRecord:
     uid: int
@@ -35,8 +39,16 @@ class MicrographRecord:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--vesicle-picker-dir", type=Path, required=True)
-    parser.add_argument("--particles-cs", type=Path, required=True)
-    parser.add_argument("--micrographs-dir", type=Path, required=True)
+    parser.add_argument("--particles-cs", type=Path)
+    parser.add_argument("--micrographs-dir", type=Path)
+    parser.add_argument(
+        "--manifest",
+        type=Path,
+        help=(
+            "Optional newline/TSV manifest of local MRC files. When provided, "
+            "leading numeric filename prefixes are used as CryoSPARC micrograph UIDs."
+        ),
+    )
     parser.add_argument("--find-parameters", type=Path, required=True)
     parser.add_argument("--filter-parameters", type=Path, required=True)
     parser.add_argument("--limit", type=int, default=0, help="Maximum micrographs to process; 0 means all.")
@@ -69,7 +81,10 @@ def parse_args() -> argparse.Namespace:
         default=1,
         help="Write progress every N micrographs; 0 disables progress lines.",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.manifest is None and (args.particles_cs is None or args.micrographs_dir is None):
+        parser.error("provide either --manifest or both --particles-cs and --micrographs-dir")
+    return args
 
 
 def micrograph_records_from_particles(particles: np.ndarray, micrographs_dir: Path) -> list[MicrographRecord]:
@@ -85,6 +100,51 @@ def micrograph_records_from_particles(particles: np.ndarray, micrographs_dir: Pa
         uid_to_source[uid] = source_path
         uid_to_path.setdefault(uid, resolve_micrograph_path(source_path, micrographs_dir, micrograph_index))
     return [MicrographRecord(uid=uid, path=uid_to_path[uid]) for uid in sorted(uid_to_path)]
+
+
+def micrograph_records_from_manifest(manifest: Path) -> list[MicrographRecord]:
+    """Build records from local MRC manifest paths using leading filename UID prefixes."""
+    records = []
+    for path in manifest_paths(manifest):
+        records.append(MicrographRecord(uid=uid_from_filename(path), path=path))
+    records = sorted(records, key=lambda record: (record.uid, record.path.name))
+    seen: dict[int, Path] = {}
+    for record in records:
+        existing = seen.get(record.uid)
+        if existing is not None and existing != record.path:
+            raise ValueError(
+                f"Manifest maps UID {record.uid} to multiple paths: {existing} and {record.path}"
+            )
+        seen[record.uid] = record.path
+    return records
+
+
+def manifest_paths(manifest: Path) -> list[Path]:
+    path = Path(manifest).expanduser().resolve()
+    if not path.is_file():
+        raise FileNotFoundError(f"Manifest does not exist: {path}")
+    out = []
+    with path.open() as handle:
+        for line_number, raw_line in enumerate(handle, start=1):
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            first = line.split("\t", 1)[0].strip()
+            if line_number == 1 and first.lower() in {"path", "mrc", "micrograph", "micrograph_path"}:
+                continue
+            out.append(Path(first).expanduser().resolve())
+    if not out:
+        raise FileNotFoundError(f"No micrograph paths found in manifest: {path}")
+    return out
+
+
+def uid_from_filename(path: Path) -> int:
+    match = CRYOSPARC_UID_PREFIX_RE.match(path.name)
+    if match is None:
+        raise ValueError(
+            f"Manifest path must start with a leading CryoSPARC UID prefix: {path}"
+        )
+    return int(match.group(1))
 
 
 def records_for_shard(
@@ -136,8 +196,9 @@ def pending_records(
 def run_local_vesicle_picker(
     *,
     vesicle_picker_dir: Path,
-    particles_cs: Path,
-    micrographs_dir: Path,
+    particles_cs: Path | None = None,
+    micrographs_dir: Path | None = None,
+    manifest: Path | None = None,
     find_parameters: Path,
     filter_parameters: Path,
     limit: int = 0,
@@ -151,8 +212,13 @@ def run_local_vesicle_picker(
     sys.path.insert(0, str(vesicle_picker_dir))
     from vesicle_picker import external_export, generate_masks, helpers, postprocess, preprocess
 
-    particles = load_particles_cs(particles_cs)
-    records = micrograph_records_from_particles(particles, micrographs_dir)
+    if manifest is not None:
+        records = micrograph_records_from_manifest(manifest)
+    else:
+        if particles_cs is None or micrographs_dir is None:
+            raise ValueError("particles_cs and micrographs_dir are required without manifest")
+        particles = load_particles_cs(particles_cs)
+        records = micrograph_records_from_particles(particles, micrographs_dir)
 
     find_config = helpers.read_config(str(find_parameters))
     filter_config = helpers.read_config(str(filter_parameters))
@@ -358,6 +424,7 @@ def main() -> None:
         vesicle_picker_dir=args.vesicle_picker_dir,
         particles_cs=args.particles_cs,
         micrographs_dir=args.micrographs_dir,
+        manifest=args.manifest,
         find_parameters=args.find_parameters,
         filter_parameters=args.filter_parameters,
         limit=args.limit,

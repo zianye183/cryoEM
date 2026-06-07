@@ -13,6 +13,7 @@ from collections.abc import Sequence
 DEFAULT_PARTITION_GPU = "bartesaghilab-a6000"
 DEFAULT_PARTITION_CPU = "bartesaghilab-cpu"
 DEFAULT_DRACO_VENV = Path("/nfs/bartesaghilab2/zy223/venvs/draco311")
+DEFAULT_VESICLE_ENV = Path("/nfs/bartesaghilab2/mm1229/conda-envs/vesicle")
 DEFAULT_DRACO_REPO = Path("/nfs/bartesaghilab2/zy223/denoising/external/draco")
 DEFAULT_DRACO_WEIGHTS = Path("/nfs/bartesaghilab2/zy223/denoising/models/draco_denoise_b.ckpt")
 DEFAULT_PROJECT_ROOT = Path("/nfs/bartesaghilab2/zy223")
@@ -40,6 +41,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--draco-repo", type=Path, default=DEFAULT_DRACO_REPO)
     parser.add_argument("--draco-weights", type=Path, default=DEFAULT_DRACO_WEIGHTS)
     parser.add_argument("--draco-venv", type=Path, default=DEFAULT_DRACO_VENV)
+    parser.add_argument("--vesicle-env", type=Path, default=DEFAULT_VESICLE_ENV)
     parser.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT)
     parser.add_argument("--draco-chunk-size", type=int, default=10)
     parser.add_argument("--sam-chunk-size", type=int, default=5)
@@ -67,7 +69,7 @@ def normalize_stages(stages: Sequence[str]) -> tuple[str, ...]:
 def validate_stage_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     missing = []
     if "sam" in args.stages:
-        for name in ("segmentation_run_dir", "particles_cs", "micrographs_dir", "vesicle_picker_dir"):
+        for name in ("segmentation_run_dir", "vesicle_picker_dir"):
             if getattr(args, name) is None:
                 missing.append("--" + name.replace("_", "-"))
     if "filter" in args.stages:
@@ -109,6 +111,7 @@ def write_slurm_scripts(
     draco_repo: Path = DEFAULT_DRACO_REPO,
     draco_weights: Path = DEFAULT_DRACO_WEIGHTS,
     draco_venv: Path = DEFAULT_DRACO_VENV,
+    vesicle_env: Path = DEFAULT_VESICLE_ENV,
     project_root: Path = DEFAULT_PROJECT_ROOT,
     draco_chunk_size: int = 10,
     sam_chunk_size: int = 5,
@@ -155,8 +158,6 @@ def write_slurm_scripts(
     if "sam" in selected_stages:
         require_paths(
             segmentation_run_dir=segmentation_run_dir,
-            particles_cs=particles_cs,
-            micrographs_dir=micrographs_dir,
             vesicle_picker_dir=vesicle_picker_dir,
         )
         sam_array = array_spec(
@@ -174,9 +175,11 @@ def write_slurm_scripts(
                 array=sam_array,
                 logs_dir=logs_dir,
                 project_root=project_root,
+                vesicle_env=vesicle_env,
                 vesicle_picker_dir=vesicle_picker_dir,
-                particles_cs=particles_cs,
+                manifest=manifest,
                 micrographs_dir=micrographs_dir,
+                particles_cs=particles_cs,
                 find_parameters=segmentation_run_dir / "parameters" / "find_vesicles.ini",
                 filter_parameters=segmentation_run_dir / "parameters" / "filter_vesicles.ini",
                 chunk_size=sam_chunk_size,
@@ -308,13 +311,23 @@ def render_sam_array_script(
     array: str,
     logs_dir: Path,
     project_root: Path,
+    vesicle_env: Path,
     vesicle_picker_dir: Path,
-    particles_cs: Path,
-    micrographs_dir: Path,
+    manifest: Path,
+    particles_cs: Path | None,
+    micrographs_dir: Path | None,
     find_parameters: Path,
     filter_parameters: Path,
     chunk_size: int,
 ) -> str:
+    input_args = (
+        f"  --manifest {quote(manifest)} \\\n"
+        if particles_cs is None
+        else (
+            f"  --particles-cs {quote(particles_cs)} \\\n"
+            f"  --micrographs-dir {quote(micrographs_dir)} \\\n"
+        )
+    )
     return (
         render_header(
             job_name="sam_array",
@@ -327,10 +340,11 @@ def render_sam_array_script(
             gres_gpu=True,
         )
         + render_env_exports()
-        + f"""python {quote(project_root / "segmentation_integration" / "scripts" / "run_local_vesicle_picker.py")} \\
+        + f"""source {quote(vesicle_env / "bin" / "activate")}
+
+python {quote(project_root / "segmentation_integration" / "scripts" / "run_local_vesicle_picker.py")} \\
   --vesicle-picker-dir {quote(vesicle_picker_dir)} \\
-  --particles-cs {quote(particles_cs)} \\
-  --micrographs-dir {quote(micrographs_dir)} \\
+{input_args.rstrip()}
   --find-parameters {quote(find_parameters)} \\
   --filter-parameters {quote(filter_parameters)} \\
   --chunk-size {chunk_size} \\
@@ -394,6 +408,7 @@ def main() -> None:
         draco_repo=args.draco_repo,
         draco_weights=args.draco_weights,
         draco_venv=args.draco_venv,
+        vesicle_env=args.vesicle_env,
         project_root=args.project_root,
         draco_chunk_size=args.draco_chunk_size,
         sam_chunk_size=args.sam_chunk_size,

@@ -36,6 +36,7 @@ class SlurmPipelineTests(unittest.TestCase):
         self.assertIn("#SBATCH --array=0-2399%4", sam_script)
         self.assertIn("#SBATCH -p bartesaghilab-a6000", draco_script)
         self.assertIn("#SBATCH --gres=gpu:1", sam_script)
+        self.assertIn("source /nfs/bartesaghilab2/mm1229/conda-envs/vesicle/bin/activate", sam_script)
         self.assertIn("--chunk-size 10", draco_script)
         self.assertIn("--chunk-size 5", sam_script)
         self.assertIn("--skip-existing", draco_script)
@@ -65,6 +66,32 @@ class SlurmPipelineTests(unittest.TestCase):
         self.assertIn("#SBATCH --array=0-1199%4", draco_script)
         self.assertIn("--output-dir /nfs/bartesaghilab2/zy223/data/prestin_draco_full", draco_script)
         self.assertFalse((root / "02_sam_array.sbatch").exists())
+        self.assertFalse((root / "03_filter_merge.sbatch").exists())
+
+    def test_write_slurm_scripts_can_generate_sam_only_from_manifest_without_particles(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            scripts = write_slurm_scripts(
+                output_dir=root,
+                manifest=Path("/runs/denoised_manifest.tsv"),
+                micrograph_count=16613,
+                denoised_dir=Path("/runs/draco_denoised"),
+                stages=("sam",),
+                segmentation_run_dir=Path("/runs/segmentation"),
+                vesicle_picker_dir=Path("/software/vesicle-picker"),
+                sam_chunk_size=5,
+                max_parallel_gpus=4,
+            )
+
+            sam_script = scripts["sam_array"].read_text()
+
+        self.assertEqual(sorted(scripts), ["sam_array"])
+        self.assertIn("#SBATCH --array=0-3322%4", sam_script)
+        self.assertIn("source /nfs/bartesaghilab2/mm1229/conda-envs/vesicle/bin/activate", sam_script)
+        self.assertIn("--manifest /runs/denoised_manifest.tsv", sam_script)
+        self.assertIn("--find-parameters /runs/segmentation/parameters/find_vesicles.ini", sam_script)
+        self.assertNotIn("--particles-cs", sam_script)
+        self.assertFalse((root / "01_draco_array.sbatch").exists())
         self.assertFalse((root / "03_filter_merge.sbatch").exists())
 
 

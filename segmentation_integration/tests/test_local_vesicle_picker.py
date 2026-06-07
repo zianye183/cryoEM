@@ -12,6 +12,7 @@ from segmentation_integration.scripts.run_local_vesicle_picker import (
     MicrographRecord,
     emit_progress,
     export_masks_to_disk_without_mutating,
+    micrograph_records_from_manifest,
     micrograph_records_from_particles,
     records_for_shard,
 )
@@ -48,6 +49,37 @@ class LocalVesiclePickerTests(unittest.TestCase):
 
         self.assertEqual([record.uid for record in records], [7, 8])
         self.assertEqual([record.path.name for record in records], ["mic_a.mrc", "mic_b.mrc"])
+
+    def test_micrograph_records_from_manifest_uses_leading_cryosparc_uid(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            mic_a = root / "000000322192952110487_FoilHole_a_patch_aligned_doseweighted_draco_denoised.mrc"
+            mic_b = root / "000001147235936382999_FoilHole_b_patch_aligned_doseweighted_draco_denoised.mrc"
+            mic_a.write_bytes(b"")
+            mic_b.write_bytes(b"")
+            manifest = root / "denoised.tsv"
+            manifest.write_text(f"{mic_b}\n{mic_a}\n")
+
+            records = micrograph_records_from_manifest(manifest)
+
+        self.assertEqual(
+            [(record.uid, record.path.name) for record in records],
+            [
+                (322192952110487, mic_a.name),
+                (1147235936382999, mic_b.name),
+            ],
+        )
+
+    def test_micrograph_records_from_manifest_rejects_paths_without_uid_prefix(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "FoilHole_no_uid_draco_denoised.mrc"
+            path.write_bytes(b"")
+            manifest = root / "denoised.tsv"
+            manifest.write_text(f"{path}\n")
+
+            with self.assertRaisesRegex(ValueError, "leading CryoSPARC UID"):
+                micrograph_records_from_manifest(manifest)
 
     def test_emit_progress_writes_cluster_log_friendly_line(self) -> None:
         stream = StringIO()

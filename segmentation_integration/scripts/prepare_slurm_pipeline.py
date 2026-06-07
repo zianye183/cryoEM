@@ -258,6 +258,13 @@ export OPENBLAS_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}"
 """
 
 
+def render_conda_activate(prefix: Path) -> str:
+    return f"""source "$(conda info --base)/etc/profile.d/conda.sh"
+conda activate {quote(prefix)}
+
+"""
+
+
 def render_draco_array_script(
     *,
     partition: str,
@@ -340,9 +347,8 @@ def render_sam_array_script(
             gres_gpu=True,
         )
         + render_env_exports()
-        + f"""source {quote(vesicle_env / "bin" / "activate")}
-
-python {quote(project_root / "segmentation_integration" / "scripts" / "run_local_vesicle_picker.py")} \\
+        + render_conda_activate(vesicle_env)
+        + f"""python {quote(project_root / "segmentation_integration" / "scripts" / "run_local_vesicle_picker.py")} \\
   --vesicle-picker-dir {quote(vesicle_picker_dir)} \\
 {input_args.rstrip()}
   --find-parameters {quote(find_parameters)} \\

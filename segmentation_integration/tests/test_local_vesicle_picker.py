@@ -13,6 +13,7 @@ from segmentation_integration.scripts.run_local_vesicle_picker import (
     emit_progress,
     export_masks_to_disk_without_mutating,
     micrograph_records_from_particles,
+    records_for_shard,
 )
 
 
@@ -87,6 +88,26 @@ class LocalVesiclePickerTests(unittest.TestCase):
         self.assertIn("segmentation", masks[0])
         self.assertEqual(exported, [("out.pkl", 7, "uint64")])
         self.assertEqual(deepcopy(masks)[0]["area"], 4)
+
+    def test_records_for_shard_uses_chunk_size(self) -> None:
+        records = [
+            MicrographRecord(uid=index, path=Path(f"/data/mic_{index}.mrc"))
+            for index in range(9)
+        ]
+
+        selected = records_for_shard(records, shard_index=1, chunk_size=4)
+
+        self.assertEqual([record.uid for record in selected], [4, 5, 6, 7])
+
+    def test_records_for_shard_uses_balanced_shard_count_without_chunk_size(self) -> None:
+        records = [
+            MicrographRecord(uid=index, path=Path(f"/data/mic_{index}.mrc"))
+            for index in range(10)
+        ]
+
+        selected = records_for_shard(records, shard_index=2, shard_count=3)
+
+        self.assertEqual([record.uid for record in selected], [7, 8, 9])
 
 
 if __name__ == "__main__":

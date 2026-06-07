@@ -14,10 +14,15 @@ from pathlib import Path
 from denoising_run_common import (
     DEFAULT_RESULTS,
     DEFAULT_SUBSET,
+    add_sharding_args,
+    allow_existing_output_dir,
+    collect_manifest_mrc_files,
     collect_mrc_files,
     ensure_empty_or_create_output_dir,
+    files_for_shard,
     require_executable,
     run_command,
+    select_pending_files,
 )
 
 
@@ -59,6 +64,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Print the command without executing it.",
     )
+    add_sharding_args(parser)
     return parser.parse_args()
 
 
@@ -90,15 +96,46 @@ def main() -> None:
     args = parse_args()
     if not args.dry_run:
         _ = require_executable("topaz")
-    files = collect_mrc_files(args.inputs)
+    files = (
+        collect_manifest_mrc_files(args.manifest)
+        if args.manifest
+        else collect_mrc_files(args.inputs)
+    )
     output_dir = Path(args.output_dir).expanduser().resolve()
     if not args.dry_run:
-        ensure_empty_or_create_output_dir(output_dir, overwrite=args.overwrite)
+        ensure_empty_or_create_output_dir(
+            output_dir,
+            overwrite=allow_existing_output_dir(
+                overwrite=args.overwrite,
+                skip_existing=args.skip_existing,
+            ),
+        )
     else:
         output_dir.mkdir(parents=True, exist_ok=True)
 
+    files = files_for_shard(
+        files,
+        shard_index=args.shard_index,
+        shard_count=args.shard_count,
+        chunk_size=args.chunk_size,
+    )
+    files = select_pending_files(
+        files,
+        output_dir=output_dir,
+        suffix=args.suffix,
+        skip_existing=args.skip_existing,
+    )
+
     print(f"Running Topaz-Denoise pretrained model on {len(files)} MRC file(s).")
+    if args.shard_index is not None:
+        print(
+            f"Shard: index={args.shard_index} chunk_size={args.chunk_size} "
+            f"shard_count={args.shard_count}"
+        )
     print(f"Output directory: {output_dir}")
+    if not files:
+        print("No pending files for this shard.")
+        return
     command = build_command(args, files, output_dir)
     run_command(command, dry_run=args.dry_run)
 

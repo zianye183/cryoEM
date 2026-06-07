@@ -4,11 +4,19 @@ This directory contains a lightweight Python-script workflow for initial cryo-EM
 
 ## Source data
 
+Full accepted motion-corrected Prestin exposures for large parallel runs:
+
+```text
+/nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/exports/groups/J80_exposures_accepted/J3/motioncorrected
+```
+
+Earlier pilot/preprocessing source used for initial tests:
+
 ```text
 /nfs/bartesaghilab/micromon/research-bartesaghilab-06/shared/users/zy223@duke.edu/projects/Prestin-1fhwPcd8gQ/sp-preprocessing-ghLbktywzmKi35IA/mrc
 ```
 
-At setup time this directory contained 35 `*_fractions.mrc` files. The workflow inspects headers before assuming whether these files are 2D micrographs or 3D frame stacks.
+At setup time the pilot/preprocessing directory contained 35 `*_fractions.mrc` files. The workflow inspects headers before assuming whether these files are 2D micrographs or 3D frame stacks.
 
 ## Main workflow
 

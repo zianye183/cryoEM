@@ -18,9 +18,14 @@ from denoising_run_common import (
     DEFAULT_PROJECT,
     DEFAULT_RESULTS,
     DEFAULT_SUBSET,
+    add_sharding_args,
+    allow_existing_output_dir,
+    collect_manifest_mrc_files,
     collect_mrc_files,
     ensure_empty_or_create_output_dir,
+    files_for_shard,
     run_command,
+    select_pending_files,
 )
 
 DEFAULT_DRACO_REPO = DEFAULT_PROJECT / "external" / "draco"
@@ -82,6 +87,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Print the command without executing it.",
     )
+    add_sharding_args(parser)
     return parser.parse_args()
 
 
@@ -133,7 +139,11 @@ def build_template_command(
 
 def main() -> None:
     args = parse_args()
-    files = collect_mrc_files(args.inputs)
+    files = (
+        collect_manifest_mrc_files(args.manifest)
+        if args.manifest
+        else collect_mrc_files(args.inputs)
+    )
     output_dir = Path(args.output_dir).expanduser().resolve()
     repo = Path(args.repo).expanduser().resolve()
     weights = Path(args.weights).expanduser().resolve()
@@ -151,14 +161,41 @@ def main() -> None:
             raise FileNotFoundError(
                 f"DRACO weights/checkpoint does not exist: {weights}"
             )
-        ensure_empty_or_create_output_dir(output_dir, overwrite=args.overwrite)
+        ensure_empty_or_create_output_dir(
+            output_dir,
+            overwrite=allow_existing_output_dir(
+                overwrite=args.overwrite,
+                skip_existing=args.skip_existing,
+            ),
+        )
     else:
         output_dir.mkdir(parents=True, exist_ok=True)
 
+    files = files_for_shard(
+        files,
+        shard_index=args.shard_index,
+        shard_count=args.shard_count,
+        chunk_size=args.chunk_size,
+    )
+    files = select_pending_files(
+        files,
+        output_dir=output_dir,
+        suffix="_draco_denoised",
+        skip_existing=args.skip_existing,
+    )
+
     print(f"Running DRACO pretrained Denoise/B adapter on {len(files)} MRC file(s).")
+    if args.shard_index is not None:
+        print(
+            f"Shard: index={args.shard_index} chunk_size={args.chunk_size} "
+            f"shard_count={args.shard_count}"
+        )
     print(f"DRACO repo: {repo}")
     print(f"Weights: {weights}")
     print(f"Output directory: {output_dir}")
+    if not files:
+        print("No pending files for this shard.")
+        return
 
     if args.adapter_script:
         command = build_adapter_command(

@@ -41,6 +41,29 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--filter-parameters", type=Path, required=True)
     parser.add_argument("--limit", type=int, default=0, help="Maximum micrographs to process; 0 means all.")
     parser.add_argument(
+        "--shard-index",
+        type=int,
+        default=None,
+        help="Zero-based shard index, usually SLURM_ARRAY_TASK_ID.",
+    )
+    parser.add_argument(
+        "--shard-count",
+        type=int,
+        default=None,
+        help="Total number of balanced shards. Not required when --chunk-size is used.",
+    )
+    parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=0,
+        help="Number of micrographs per shard. Use with --shard-index for Slurm arrays.",
+    )
+    parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="Skip micrographs whose filtered mask output already exists.",
+    )
+    parser.add_argument(
         "--progress-every",
         type=int,
         default=1,
@@ -64,6 +87,52 @@ def micrograph_records_from_particles(particles: np.ndarray, micrographs_dir: Pa
     return [MicrographRecord(uid=uid, path=uid_to_path[uid]) for uid in sorted(uid_to_path)]
 
 
+def records_for_shard(
+    records: list[MicrographRecord],
+    *,
+    shard_index: int | None = None,
+    shard_count: int | None = None,
+    chunk_size: int = 0,
+) -> list[MicrographRecord]:
+    """Return micrograph records assigned to one Slurm-array shard."""
+    if shard_index is None:
+        return records
+    if shard_index < 0:
+        raise ValueError("--shard-index must be >= 0")
+    if chunk_size < 0:
+        raise ValueError("--chunk-size must be >= 0")
+    if chunk_size > 0:
+        start = shard_index * chunk_size
+        return records[start : start + chunk_size]
+    if shard_count is None:
+        raise ValueError("--shard-count is required when --shard-index is used without --chunk-size")
+    if shard_count <= 0:
+        raise ValueError("--shard-count must be > 0")
+    if shard_index >= shard_count:
+        return []
+    base = len(records) // shard_count
+    remainder = len(records) % shard_count
+    start = shard_index * base + min(shard_index, remainder)
+    size = base + (1 if shard_index < remainder else 0)
+    return records[start : start + size]
+
+
+def pending_records(
+    records: list[MicrographRecord],
+    *,
+    filtered_dir: Path,
+    skip_existing: bool,
+) -> list[MicrographRecord]:
+    """Drop records whose final filtered-mask pickle already exists."""
+    if not skip_existing:
+        return records
+    return [
+        record
+        for record in records
+        if not (filtered_dir / f"{record.uid}_vesicles_filtered.pkl").exists()
+    ]
+
+
 def run_local_vesicle_picker(
     *,
     vesicle_picker_dir: Path,
@@ -72,6 +141,10 @@ def run_local_vesicle_picker(
     find_parameters: Path,
     filter_parameters: Path,
     limit: int = 0,
+    shard_index: int | None = None,
+    shard_count: int | None = None,
+    chunk_size: int = 0,
+    skip_existing: bool = False,
     progress_every: int = 1,
     progress_stream=sys.stderr,
 ) -> dict[str, int]:
@@ -80,8 +153,6 @@ def run_local_vesicle_picker(
 
     particles = load_particles_cs(particles_cs)
     records = micrograph_records_from_particles(particles, micrographs_dir)
-    if limit > 0:
-        records = records[:limit]
 
     find_config = helpers.read_config(str(find_parameters))
     filter_config = helpers.read_config(str(filter_parameters))
@@ -89,6 +160,27 @@ def run_local_vesicle_picker(
     filtered_dir = Path(filter_config.get("output", "directory"))
     found_dir.mkdir(parents=True, exist_ok=True)
     filtered_dir.mkdir(parents=True, exist_ok=True)
+    if limit > 0:
+        records = records[:limit]
+    records = records_for_shard(
+        records,
+        shard_index=shard_index,
+        shard_count=shard_count,
+        chunk_size=chunk_size,
+    )
+    records = pending_records(
+        records,
+        filtered_dir=filtered_dir,
+        skip_existing=skip_existing,
+    )
+    if not records:
+        return {
+            "micrographs_seen": 0,
+            "micrographs_processed": 0,
+            "found_mask_files": 0,
+            "filtered_mask_files": 0,
+            "empty_micrographs": 0,
+        }
 
     model = generate_masks.initialize_model(
         model_weights_path=find_config.get("segmentation", "model_weights_path"),
@@ -269,6 +361,10 @@ def main() -> None:
         find_parameters=args.find_parameters,
         filter_parameters=args.filter_parameters,
         limit=args.limit,
+        shard_index=args.shard_index,
+        shard_count=args.shard_count,
+        chunk_size=args.chunk_size,
+        skip_existing=args.skip_existing,
         progress_every=args.progress_every,
     )
     print(json.dumps(summary, indent=2))

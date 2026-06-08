@@ -92,6 +92,70 @@ as `{uid}_found_mask_metrics.png`, with accepted masks in green and rejected
 masks in red.
 The final membrane-band mask PNGs are produced under `filtered_particles/masks/`.
 
+## CryoVIA vs SAM visual benchmark
+
+Use the visual benchmark to compare CryoVIA's pretrained U-Net segmentation
+against the existing SAM/Vesicle Picker pipeline on the same micrograph subset.
+This is a manual-inspection workflow only: it writes side-by-side overlays and
+does not calculate Dice, IoU, precision, or recall.
+
+The benchmark expects CryoVIA and GridEdgeDetector to be installed in the active
+Python environment. CryoVIA is treated as an external dependency; its source is
+not copied into this repository. By default the benchmark uses CryoVIA's
+`Default_thin` model, because CryoVIA's own guide recommends the thin-membrane
+model when close membranes need more consistent separation.
+
+Create a small manifest of 10-20 representative MRC files. Each filename must
+start with its CryoSPARC micrograph UID, matching the local Vesicle Picker
+manifest convention:
+
+```text
+micrograph_path
+/path/to/0000000000000007_micrograph.mrc
+/path/to/0000000000000008_micrograph.mrc
+```
+
+Then run:
+
+```bash
+python segmentation_integration/scripts/run_segmentation_visual_benchmark.py \
+  --manifest /path/to/manifest.tsv \
+  --output-dir /path/to/segmentation_visual_benchmark \
+  --vesicle-picker-dir /nfs/bartesaghilab2/mm1229/segmentation_code/vesicle-picker \
+  --sam-find-parameters /path/to/find_vesicles.ini \
+  --sam-filter-parameters /path/to/filter_vesicles.ini \
+  --cryovia-model Default_thin \
+  --limit 20
+```
+
+Use `--dry-run` to write the review scaffold and resolved config without running
+CryoVIA, TensorFlow, or SAM.
+
+This writes:
+
+```text
+/path/to/segmentation_visual_benchmark/
+  manifest.tsv
+  config.json
+  parameters/
+    find_vesicles.ini
+    filter_vesicles.ini
+  cryovia_labels/
+  sam_found/
+  sam_filtered/
+  overlays/
+    *_cryovia_default_thin.png
+    *_sam_found.png
+    *_sam_filtered.png
+    *_comparison.png
+  index.html
+  run_summary.json
+```
+
+Open `index.html` to inspect the visual comparison. `Default`, `Default_thin`,
+`Default_tomogram_slices`, or an explicit CryoVIA model directory can be passed
+with `--cryovia-model` for follow-up sanity checks.
+
 To render upstream QC from existing Vesicle Picker outputs:
 
 ```bash

@@ -1,0 +1,158 @@
+"""Wrapper for running CryoVIA pretrained segmentation models."""
+
+from __future__ import annotations
+
+import shutil
+from dataclasses import dataclass
+from pathlib import Path
+
+
+DEFAULT_CRYOVIA_MODEL = "Default_thin"
+PACKAGED_CRYOVIA_MODELS = {"Default", "Default_thin", "Default_tomogram_slices"}
+
+
+@dataclass(frozen=True)
+class CryoviaSegmentationResult:
+    micrographs_seen: int
+    micrographs_processed: int
+    label_files: list[Path]
+    model: str
+
+
+def resolve_cryovia_model(model: str | Path) -> str | Path:
+    """Resolve a packaged CryoVIA model name or explicit model directory."""
+    if isinstance(model, Path):
+        return model
+    text = str(model)
+    if text in PACKAGED_CRYOVIA_MODELS:
+        return text
+    path = Path(text).expanduser()
+    if path.exists():
+        return path
+    choices = ", ".join(sorted(PACKAGED_CRYOVIA_MODELS))
+    raise ValueError(f"Unknown CryoVIA model {text!r}; expected one of {choices} or a model directory")
+
+
+def run_cryovia_segmentation(
+    *,
+    micrograph_paths: list[Path],
+    output_dir: Path,
+    cryovia_model: str | Path = DEFAULT_CRYOVIA_MODEL,
+    pixel_size_a: float = 7.0,
+    gpus: str = "",
+    njobs: int = 2,
+    skip_existing: bool = False,
+) -> CryoviaSegmentationResult:
+    """Run CryoVIA segmentation and return written label paths.
+
+    CryoVIA, GridEdgeDetector, TensorFlow, and their GUI dependencies are imported
+    lazily so this repository remains testable without that runtime installed.
+    """
+    selected_model = resolve_cryovia_model(cryovia_model)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    pending = [
+        Path(path)
+        for path in micrograph_paths
+        if not skip_existing or not (output_dir / f"{Path(path).stem}_labels.npz").exists()
+    ]
+    if not pending:
+        return CryoviaSegmentationResult(
+            micrographs_seen=len(micrograph_paths),
+            micrographs_processed=0,
+            label_files=sorted(output_dir.glob("*_labels.npz")),
+            model=str(selected_model),
+        )
+
+    model = _load_segmentation_model(selected_model)
+    kwargs = _cryovia_segmentation_kwargs(model_name=str(selected_model))
+    gpu_list = _parse_gpu_list(gpus)
+    results = model.predict_multiprocessing(
+        pending,
+        [pixel_size_a] * len(pending),
+        gpu=gpu_list,
+        kwargs=kwargs,
+        njobs=njobs,
+        dataset_name="CryoVIA visual benchmark",
+        seg_path=output_dir,
+    )
+    label_files = [Path(path) for path in results.values()] if isinstance(results, dict) else sorted(output_dir.glob("*_labels.npz"))
+    return CryoviaSegmentationResult(
+        micrographs_seen=len(micrograph_paths),
+        micrographs_processed=len(pending),
+        label_files=label_files,
+        model=str(selected_model),
+    )
+
+
+def _load_segmentation_model(model: str | Path):
+    import cryovia
+    from cryovia.gui.Unpickler import CustomUnpickler
+    from cryovia.gui.path_variables import CRYOVIA_PATH
+
+    _ensure_default_segmentation_models(cryovia_package_dir=Path(cryovia.__file__).parent, cryovia_home=CRYOVIA_PATH)
+    if isinstance(model, Path):
+        model_dir = model
+    else:
+        model_dir = CRYOVIA_PATH / "SegmentationModels" / model
+    pickle_path = model_dir / "Segmentator.pickle"
+    weights_path = model_dir / "best.weights.h5"
+    legacy_weights_path = model_dir / "best_weights.h5"
+    if not pickle_path.exists():
+        raise FileNotFoundError(f"CryoVIA model pickle not found: {pickle_path}")
+    if not weights_path.exists() and legacy_weights_path.exists():
+        shutil.copy(legacy_weights_path, weights_path)
+    if not weights_path.exists():
+        raise FileNotFoundError(f"CryoVIA model weights not found: {weights_path}")
+    with pickle_path.open("rb") as handle:
+        loaded = CustomUnpickler(handle).load()
+    loaded.config.save_dir = model_dir
+    loaded.print = print
+    return loaded
+
+
+def _ensure_default_segmentation_models(*, cryovia_package_dir: Path, cryovia_home: Path) -> None:
+    model_root = cryovia_home / "SegmentationModels"
+    model_root.mkdir(parents=True, exist_ok=True)
+    for model_name in sorted(PACKAGED_CRYOVIA_MODELS):
+        target = model_root / model_name
+        if target.exists():
+            continue
+        source = cryovia_package_dir / "default_models" / model_name
+        pickle_path = source / "Segmentator.pickle"
+        weights_path = source / "best_weights.h5"
+        if not pickle_path.exists():
+            raise FileNotFoundError(f"Packaged CryoVIA model pickle not found: {pickle_path}")
+        if not weights_path.exists():
+            raise FileNotFoundError(f"Packaged CryoVIA model weights not found: {weights_path}")
+        shutil.copytree(source, target)
+
+
+def _cryovia_segmentation_kwargs(*, model_name: str) -> dict:
+    return {
+        "run": {"maskGrid": False},
+        "general": {
+            "use_only_closed": True,
+            "rerun": False,
+            "step_size": 13,
+            "min_size": 50,
+            "only_run_for_new_data": False,
+            "estimate_middle_plane": True,
+            "dark_mode": True,
+        },
+        "segmentation": {
+            "rerun_segmentation": True,
+            "identify_instances": True,
+            "segmentation_model": model_name,
+            "max_batch_size": 0,
+            "only_segmentation": True,
+            "combine_snippets": False,
+            "max_nodes": 30,
+        },
+        "maskGrid": {},
+    }
+
+
+def _parse_gpu_list(gpus: str) -> list[int]:
+    if not gpus:
+        return [0]
+    return [int(item) for item in gpus.split(",") if item.strip()]

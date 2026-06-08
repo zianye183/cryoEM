@@ -75,6 +75,31 @@ class VisualBenchmarkCliTests(unittest.TestCase):
         self.assertTrue(manifest_exists)
         self.assertTrue(index_exists)
 
+    def test_run_visual_benchmark_records_split_env_skip_flags(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = root / "0007_first.mrc"
+            first.touch()
+            manifest = root / "manifest.tsv"
+            manifest.write_text(f"path\n{first}\n")
+            output_dir = root / "benchmark"
+
+            run_visual_benchmark(
+                manifest=manifest,
+                output_dir=output_dir,
+                vesicle_picker_dir=root / "vesicle-picker",
+                sam_find_parameters=root / "find_vesicles.ini",
+                sam_filter_parameters=root / "filter_vesicles.ini",
+                dry_run=True,
+                skip_sam_run=True,
+                skip_cryovia_run=True,
+            )
+
+            config = json.loads((output_dir / "config.json").read_text())
+
+        self.assertTrue(config["skip_sam_run"])
+        self.assertTrue(config["skip_cryovia_run"])
+
 
 if __name__ == "__main__":
     unittest.main()

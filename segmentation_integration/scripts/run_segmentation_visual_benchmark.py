@@ -51,6 +51,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--gpus", default="")
     parser.add_argument("--njobs", type=int, default=2)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--skip-sam-run", action="store_true", help="Reuse existing sam_found/sam_filtered outputs.")
+    parser.add_argument("--skip-cryovia-run", action="store_true", help="Reuse existing cryovia_labels outputs.")
     return parser.parse_args()
 
 
@@ -83,6 +85,8 @@ def run_visual_benchmark(
     gpus: str = "",
     njobs: int = 2,
     dry_run: bool = False,
+    skip_sam_run: bool = False,
+    skip_cryovia_run: bool = False,
 ) -> dict[str, object]:
     output_dir = Path(output_dir)
     cryovia_labels = output_dir / "cryovia_labels"
@@ -111,45 +115,57 @@ def run_visual_benchmark(
         "gpus": gpus,
         "njobs": njobs,
         "dry_run": dry_run,
+        "skip_sam_run": skip_sam_run,
+        "skip_cryovia_run": skip_cryovia_run,
     }
     _write_json(output_dir / "config.json", config)
 
     sam_summary = {"mode": "dry_run"}
     cryovia_summary = {"mode": "dry_run"}
     if not dry_run:
-        staged_find_parameters = output_dir / "parameters" / "find_vesicles.ini"
-        staged_filter_parameters = output_dir / "parameters" / "filter_vesicles.ini"
-        _stage_sam_parameters(
-            find_parameters=sam_find_parameters,
-            filter_parameters=sam_filter_parameters,
-            staged_find_parameters=staged_find_parameters,
-            staged_filter_parameters=staged_filter_parameters,
-            sam_found=sam_found,
-            sam_filtered=sam_filtered,
-        )
-        cryovia_result = run_cryovia_segmentation(
-            micrograph_paths=[record.path for record in records],
-            output_dir=cryovia_labels,
-            cryovia_model=cryovia_model,
-            pixel_size_a=pixel_size_a,
-            gpus=gpus,
-            njobs=njobs,
-            skip_existing=skip_existing,
-        )
-        cryovia_summary = {
-            "model": cryovia_result.model,
-            "micrographs_seen": cryovia_result.micrographs_seen,
-            "micrographs_processed": cryovia_result.micrographs_processed,
-            "label_files": [str(path) for path in cryovia_result.label_files],
-        }
-        sam_summary = run_local_vesicle_picker(
-            vesicle_picker_dir=vesicle_picker_dir,
-            manifest=output_dir / "manifest.tsv",
-            find_parameters=staged_find_parameters,
-            filter_parameters=staged_filter_parameters,
-            skip_existing=skip_existing,
-            progress_every=1,
-        )
+        if skip_cryovia_run:
+            cryovia_summary = {"mode": "skipped", "label_files": [str(path) for path in sorted(cryovia_labels.glob("*_labels.npz"))]}
+        else:
+            cryovia_result = run_cryovia_segmentation(
+                micrograph_paths=[record.path for record in records],
+                output_dir=cryovia_labels,
+                cryovia_model=cryovia_model,
+                pixel_size_a=pixel_size_a,
+                gpus=gpus,
+                njobs=njobs,
+                skip_existing=skip_existing,
+            )
+            cryovia_summary = {
+                "model": cryovia_result.model,
+                "micrographs_seen": cryovia_result.micrographs_seen,
+                "micrographs_processed": cryovia_result.micrographs_processed,
+                "label_files": [str(path) for path in cryovia_result.label_files],
+            }
+        if skip_sam_run:
+            sam_summary = {
+                "mode": "skipped",
+                "found_mask_files": len(list(sam_found.glob("*_vesicles.pkl"))),
+                "filtered_mask_files": len(list(sam_filtered.glob("*_vesicles_filtered.pkl"))),
+            }
+        else:
+            staged_find_parameters = output_dir / "parameters" / "find_vesicles.ini"
+            staged_filter_parameters = output_dir / "parameters" / "filter_vesicles.ini"
+            _stage_sam_parameters(
+                find_parameters=sam_find_parameters,
+                filter_parameters=sam_filter_parameters,
+                staged_find_parameters=staged_find_parameters,
+                staged_filter_parameters=staged_filter_parameters,
+                sam_found=sam_found,
+                sam_filtered=sam_filtered,
+            )
+            sam_summary = run_local_vesicle_picker(
+                vesicle_picker_dir=vesicle_picker_dir,
+                manifest=output_dir / "manifest.tsv",
+                find_parameters=staged_find_parameters,
+                filter_parameters=staged_filter_parameters,
+                skip_existing=skip_existing,
+                progress_every=1,
+            )
 
     review_rows = []
     if not dry_run:
@@ -365,6 +381,8 @@ def main() -> None:
         gpus=args.gpus,
         njobs=args.njobs,
         dry_run=args.dry_run,
+        skip_sam_run=args.skip_sam_run,
+        skip_cryovia_run=args.skip_cryovia_run,
     )
     print(json.dumps(summary, indent=2, sort_keys=True))
 

@@ -66,8 +66,9 @@ def render_segmentation_overlay(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(8, 8))
     ax.imshow(display, cmap="gray", origin="upper", vmin=vmin, vmax=vmax)
+    drew_any_mask = False
     for mask, label, color in zip(masks, labels, colors):
-        _draw_mask_contour(
+        drew_any_mask |= _draw_mask_contour(
             ax,
             mask,
             color=color,
@@ -78,7 +79,7 @@ def render_segmentation_overlay(
         )
     ax.set_title(title)
     ax.set_axis_off()
-    if labels:
+    if drew_any_mask:
         ax.legend(loc="upper right", fontsize="small", framealpha=0.75)
     fig.tight_layout(pad=0)
     fig.savefig(output_path, dpi=dpi)
@@ -193,19 +194,34 @@ def _draw_mask_contour(
     mask_downsample: int,
     display_downsample: int,
     image_shape: tuple[int, int],
-) -> None:
+) -> bool:
     mask = np.asarray(mask, dtype=bool)
     if mask.size == 0 or not mask.any():
-        return
-    edge = mask & ~ndimage.binary_erosion(mask)
+        return False
+    full = _scale_mask_to_image_shape(mask, mask_downsample=mask_downsample, image_shape=image_shape)
+    edge = full & ~ndimage.binary_erosion(full)
     edge = ndimage.binary_dilation(edge, iterations=1)
-    full = np.repeat(np.repeat(edge, mask_downsample, axis=0), mask_downsample, axis=1)
-    full = full[: image_shape[0], : image_shape[1]]
-    shown = full[::display_downsample, ::display_downsample]
+    shown = edge[::display_downsample, ::display_downsample]
     rgba = np.zeros((*shown.shape, 4), dtype=float)
     rgba[shown] = matplotlib.colors.to_rgba(color, alpha=0.95)
     ax.imshow(rgba, interpolation="nearest", origin="upper", label=label)
     ax.plot([], [], color=color, label=label)
+    return True
+
+
+def _scale_mask_to_image_shape(mask: np.ndarray, *, mask_downsample: int, image_shape: tuple[int, int]) -> np.ndarray:
+    if mask_downsample <= 0:
+        raise ValueError("mask_downsample must be positive")
+    full = np.repeat(np.repeat(np.asarray(mask, dtype=bool), mask_downsample, axis=0), mask_downsample, axis=1)
+    if full.shape == image_shape:
+        return full
+    zoom = (image_shape[0] / full.shape[0], image_shape[1] / full.shape[1])
+    scaled = ndimage.zoom(full.astype(np.uint8), zoom, order=0) > 0
+    if scaled.shape[0] < image_shape[0] or scaled.shape[1] < image_shape[1]:
+        padded = np.zeros(image_shape, dtype=bool)
+        padded[: scaled.shape[0], : scaled.shape[1]] = scaled
+        return padded
+    return scaled[: image_shape[0], : image_shape[1]]
 
 
 def _image_cell(path: str) -> str:

@@ -7,6 +7,7 @@ import numpy as np
 
 from segmentation_integration.mrc_io import write_mode2_mrc_for_test
 from segmentation_integration.segmentation_preview import (
+    _scale_mask_to_image_shape,
     load_cryovia_label_mask,
     load_vesicle_picker_union_mask,
     render_segmentation_comparison,
@@ -73,6 +74,16 @@ class SegmentationPreviewTests(unittest.TestCase):
             )
 
             self.assertGreater(out_path.stat().st_size, 0)
+
+    def test_scale_mask_to_image_shape_infers_missing_cryovia_scale(self) -> None:
+        mask = np.zeros((10, 10), dtype=bool)
+        mask[4:6, 4:6] = True
+
+        scaled = _scale_mask_to_image_shape(mask, mask_downsample=1, image_shape=(20, 20))
+
+        self.assertEqual(scaled.shape, (20, 20))
+        self.assertTrue(scaled[8:12, 8:12].all())
+        self.assertFalse(scaled[:4, :4].any())
 
     def test_render_segmentation_comparison_writes_side_by_side_png(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

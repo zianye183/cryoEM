@@ -108,14 +108,11 @@ def configure_cryovia_home(cryovia_home: Path | None = None) -> Path:
 
 def _load_segmentation_model(model: str | Path):
     import cryovia
-    from cryovia.gui.Unpickler import CustomUnpickler
     from cryovia.gui.path_variables import CRYOVIA_PATH
+    from cryovia.gui.segmentation_files.segmentation_model import segmentationModelFactory
 
     _ensure_default_segmentation_models(cryovia_package_dir=Path(cryovia.__file__).parent, cryovia_home=CRYOVIA_PATH)
-    if isinstance(model, Path):
-        model_dir = model
-    else:
-        model_dir = CRYOVIA_PATH / "SegmentationModels" / model
+    model_dir = _runtime_model_directory(model=model, cryovia_home=CRYOVIA_PATH)
     pickle_path = model_dir / "Segmentator.pickle"
     weights_path = model_dir / "best.weights.h5"
     legacy_weights_path = model_dir / "best_weights.h5"
@@ -125,11 +122,23 @@ def _load_segmentation_model(model: str | Path):
         shutil.copy(legacy_weights_path, weights_path)
     if not weights_path.exists():
         raise FileNotFoundError(f"CryoVIA model weights not found: {weights_path}")
-    with pickle_path.open("rb") as handle:
-        loaded = CustomUnpickler(handle).load()
-    loaded.config.save_dir = model_dir
+    loaded = segmentationModelFactory(filepath=pickle_path)
+    loaded.config.name = model_dir.name
     loaded.print = print
     return loaded
+
+
+def _runtime_model_directory(*, model: str | Path, cryovia_home: Path) -> Path:
+    model_root = cryovia_home / "SegmentationModels"
+    if not isinstance(model, Path):
+        return model_root / model
+    model = model.expanduser().resolve()
+    runtime_model = model_root / model.name
+    if model == runtime_model.resolve():
+        return runtime_model
+    if not runtime_model.exists():
+        shutil.copytree(model, runtime_model)
+    return runtime_model
 
 
 def _ensure_default_segmentation_models(*, cryovia_package_dir: Path, cryovia_home: Path) -> None:

@@ -8,6 +8,7 @@ import h5py
 
 from segmentation_integration.cryovia_runner import (
     _has_keras_v3_vars_group,
+    _parse_gpu_list,
     _prepare_cryovia_weights,
     _runtime_model_directory,
     configure_cryovia_home,
@@ -94,6 +95,15 @@ class CryoviaRunnerTests(unittest.TestCase):
             self.assertEqual(model.built_model.loaded_from, legacy_weights_path)
             self.assertEqual(model.built_model.saved_to, weights_path)
             self.assertTrue(_has_keras_v3_vars_group(weights_path))
+
+    def test_parse_gpu_list_returns_tensorflow_device_names(self) -> None:
+        self.assertEqual(_parse_gpu_list("0"), ["/GPU:0"])
+        self.assertEqual(_parse_gpu_list("0,1"), ["/GPU:0", "/GPU:1"])
+        self.assertEqual(_parse_gpu_list("/GPU:2"), ["/GPU:2"])
+        self.assertEqual(_parse_gpu_list("CPU:0"), ["/CPU:0"])
+
+    def test_parse_gpu_list_defaults_to_cpu_device(self) -> None:
+        self.assertEqual(_parse_gpu_list(""), ["/CPU:0"])
 
 
 if __name__ == "__main__":

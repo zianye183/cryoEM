@@ -80,9 +80,11 @@ def run_cryovia_segmentation(
         seg_path=output_dir,
     )
     label_files = [Path(path) for path in results.values()] if isinstance(results, dict) else sorted(output_dir.glob("*_labels.npz"))
+    if not label_files:
+        label_files = sorted(output_dir.glob("*_labels.npz"))
     return CryoviaSegmentationResult(
         micrographs_seen=len(micrograph_paths),
-        micrographs_processed=len(pending),
+        micrographs_processed=len(label_files),
         label_files=label_files,
         model=str(selected_model),
     )
@@ -205,7 +207,18 @@ def _cryovia_segmentation_kwargs(*, model_name: str) -> dict:
     }
 
 
-def _parse_gpu_list(gpus: str) -> list[int]:
+def _parse_gpu_list(gpus: str) -> list[str]:
     if not gpus:
-        return [0]
-    return [int(item) for item in gpus.split(",") if item.strip()]
+        return ["/CPU:0"]
+    devices = []
+    for item in gpus.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        if item.startswith("/"):
+            devices.append(item)
+        elif item.upper().startswith(("GPU:", "CPU:")):
+            devices.append(f"/{item.upper()}")
+        else:
+            devices.append(f"/GPU:{int(item)}")
+    return devices

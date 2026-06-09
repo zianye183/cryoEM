@@ -100,6 +100,30 @@ class VisualBenchmarkCliTests(unittest.TestCase):
         self.assertTrue(config["skip_sam_run"])
         self.assertTrue(config["skip_cryovia_run"])
 
+    def test_run_visual_benchmark_records_cryovia_home(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = root / "0007_first.mrc"
+            first.touch()
+            manifest = root / "manifest.tsv"
+            manifest.write_text(f"path\n{first}\n")
+            output_dir = root / "benchmark"
+            cryovia_home = root / "cryovia_runtime_home"
+
+            run_visual_benchmark(
+                manifest=manifest,
+                output_dir=output_dir,
+                vesicle_picker_dir=root / "vesicle-picker",
+                sam_find_parameters=root / "find_vesicles.ini",
+                sam_filter_parameters=root / "filter_vesicles.ini",
+                cryovia_home=cryovia_home,
+                dry_run=True,
+            )
+
+            config = json.loads((output_dir / "config.json").read_text())
+
+        self.assertEqual(config["cryovia_home"], str(cryovia_home))
+
 
 if __name__ == "__main__":
     unittest.main()

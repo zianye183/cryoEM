@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
 
 DEFAULT_CRYOVIA_MODEL = "Default_thin"
+DEFAULT_CLUSTER_CRYOVIA_HOME = Path("/nfs/bartesaghilab2/zy223/cryovia_runtime_home")
 PACKAGED_CRYOVIA_MODELS = {"Default", "Default_thin", "Default_tomogram_slices"}
 
 
@@ -38,6 +40,7 @@ def run_cryovia_segmentation(
     micrograph_paths: list[Path],
     output_dir: Path,
     cryovia_model: str | Path = DEFAULT_CRYOVIA_MODEL,
+    cryovia_home: Path | None = None,
     pixel_size_a: float = 7.0,
     gpus: str = "",
     njobs: int = 2,
@@ -63,6 +66,7 @@ def run_cryovia_segmentation(
             model=str(selected_model),
         )
 
+    configure_cryovia_home(cryovia_home)
     model = _load_segmentation_model(selected_model)
     kwargs = _cryovia_segmentation_kwargs(model_name=str(selected_model))
     gpu_list = _parse_gpu_list(gpus)
@@ -82,6 +86,24 @@ def run_cryovia_segmentation(
         label_files=label_files,
         model=str(selected_model),
     )
+
+
+def default_cryovia_home() -> Path:
+    """Return a writable home directory for CryoVIA runtime files."""
+    configured = os.environ.get("CRYOVIA_HOME")
+    if configured:
+        return Path(configured).expanduser()
+    if DEFAULT_CLUSTER_CRYOVIA_HOME.parent.exists():
+        return DEFAULT_CLUSTER_CRYOVIA_HOME
+    return Path.home()
+
+
+def configure_cryovia_home(cryovia_home: Path | None = None) -> Path:
+    """Set the process HOME before CryoVIA initializes its ~/.cryovia path."""
+    resolved = Path(cryovia_home).expanduser() if cryovia_home is not None else default_cryovia_home()
+    resolved.mkdir(parents=True, exist_ok=True)
+    os.environ["HOME"] = str(resolved)
+    return resolved
 
 
 def _load_segmentation_model(model: str | Path):

@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from segmentation_integration.cryovia_runner import DEFAULT_CRYOVIA_MODEL, run_cryovia_segmentation
+from segmentation_integration.cryovia_runner import DEFAULT_CRYOVIA_MODEL, default_cryovia_home, run_cryovia_segmentation
 from segmentation_integration.scripts.run_local_vesicle_picker import run_local_vesicle_picker
 from segmentation_integration.segmentation_preview import (
     load_cryovia_label_mask,
@@ -43,6 +43,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sam-find-parameters", type=Path, required=True)
     parser.add_argument("--sam-filter-parameters", type=Path, required=True)
     parser.add_argument("--cryovia-model", default=DEFAULT_CRYOVIA_MODEL)
+    parser.add_argument(
+        "--cryovia-home",
+        type=Path,
+        default=None,
+        help=(
+            "Runtime home for CryoVIA .cryovia files. Defaults to CRYOVIA_HOME, "
+            "or /nfs/bartesaghilab2/zy223/cryovia_runtime_home when available."
+        ),
+    )
     parser.add_argument("--pixel-size-a", type=float, default=7.0)
     parser.add_argument("--sam-downsample", type=int, default=4)
     parser.add_argument("--cryovia-downsample", type=int, default=1)
@@ -77,6 +86,7 @@ def run_visual_benchmark(
     sam_find_parameters: Path,
     sam_filter_parameters: Path,
     cryovia_model: str = DEFAULT_CRYOVIA_MODEL,
+    cryovia_home: Path | None = None,
     pixel_size_a: float = 7.0,
     sam_downsample: int = 4,
     cryovia_downsample: int = 1,
@@ -100,6 +110,7 @@ def run_visual_benchmark(
     if limit > 0:
         records = records[:limit]
     _write_manifest(output_dir / "manifest.tsv", records)
+    resolved_cryovia_home = default_cryovia_home() if cryovia_home is None else Path(cryovia_home).expanduser()
     config = {
         "manifest": str(manifest),
         "output_dir": str(output_dir),
@@ -107,6 +118,7 @@ def run_visual_benchmark(
         "sam_find_parameters": str(sam_find_parameters),
         "sam_filter_parameters": str(sam_filter_parameters),
         "cryovia_model": cryovia_model,
+        "cryovia_home": str(resolved_cryovia_home),
         "pixel_size_a": pixel_size_a,
         "sam_downsample": sam_downsample,
         "cryovia_downsample": cryovia_downsample,
@@ -130,6 +142,7 @@ def run_visual_benchmark(
                 micrograph_paths=[record.path for record in records],
                 output_dir=cryovia_labels,
                 cryovia_model=cryovia_model,
+                cryovia_home=resolved_cryovia_home,
                 pixel_size_a=pixel_size_a,
                 gpus=gpus,
                 njobs=njobs,
@@ -373,6 +386,7 @@ def main() -> None:
         sam_find_parameters=args.sam_find_parameters,
         sam_filter_parameters=args.sam_filter_parameters,
         cryovia_model=args.cryovia_model,
+        cryovia_home=args.cryovia_home,
         pixel_size_a=args.pixel_size_a,
         sam_downsample=args.sam_downsample,
         cryovia_downsample=args.cryovia_downsample,

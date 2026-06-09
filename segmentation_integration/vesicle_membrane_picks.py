@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 import numpy as np
 from scipy import ndimage
@@ -173,6 +174,8 @@ def export_vesicle_membrane_picks(
     box_size_a: float = 100.0,
     dilation_radius_a: float = 0.0,
     mode: str = "edge",
+    progress: bool = False,
+    progress_stream: TextIO = sys.stderr,
 ) -> VesicleMembranePickOutputs:
     """Write offline vesicle membrane picks as CryoSPARC-compatible files."""
     validate_pick_parameters(psize_a=psize_a, downsample=downsample, box_size_a=box_size_a, mode=mode)
@@ -187,11 +190,21 @@ def export_vesicle_membrane_picks(
 
     rows: list[dict[str, Any]] = []
     micrograph_summaries = []
-    for uid, metadata in representatives.items():
+    total_micrographs = len(representatives)
+    for index, (uid, metadata) in enumerate(representatives.items(), start=1):
         mask_path = mask_path_for_uid(vesicle_mask_dir, uid)
         if not mask_path.exists():
             micrograph_summaries.append(
                 micrograph_summary(metadata, status="missing_mask", pick_count=0)
+            )
+            emit_progress(
+                progress_stream,
+                enabled=progress,
+                index=index,
+                total=total_micrographs,
+                uid=uid,
+                status="missing_mask",
+                pick_count=0,
             )
             continue
         masks = load_vesicle_masks(mask_path)
@@ -207,6 +220,15 @@ def export_vesicle_membrane_picks(
             rows.append({"metadata": metadata, "y_full": int(y_full), "x_full": int(x_full)})
         micrograph_summaries.append(
             micrograph_summary(metadata, status="picked", pick_count=len(pick_indices))
+        )
+        emit_progress(
+            progress_stream,
+            enabled=progress,
+            index=index,
+            total=total_micrographs,
+            uid=uid,
+            status="picked",
+            pick_count=len(pick_indices),
         )
 
     picks_cs = output_dir / "vesicle_membrane_picks.cs"
@@ -233,6 +255,25 @@ def export_vesicle_membrane_picks(
         total_picks=len(picks),
     )
     return VesicleMembranePickOutputs(picks_cs=picks_cs, picks_csg=picks_csg, summary_json=summary_json)
+
+
+def emit_progress(
+    stream: TextIO,
+    *,
+    enabled: bool,
+    index: int,
+    total: int,
+    uid: int,
+    status: str,
+    pick_count: int,
+) -> None:
+    if not enabled:
+        return
+    print(
+        f"[vesicle membrane picks] {index}/{total} done uid={uid} status={status} picks={pick_count}",
+        file=stream,
+        flush=True,
+    )
 
 
 def resolve_metadata_paths(

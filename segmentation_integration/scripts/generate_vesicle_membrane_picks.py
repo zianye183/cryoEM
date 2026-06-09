@@ -66,6 +66,7 @@ def main() -> None:
         box_size_a=args.box_size_a,
         dilation_radius_a=args.dilation_radius_a,
         mode=args.mode,
+        progress=True,
     )
     print(f"Wrote vesicle membrane picks: {outputs.picks_cs}")
     print(f"Import result group in CryoSPARC with: {outputs.picks_csg}")

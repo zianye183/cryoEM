@@ -215,6 +215,13 @@ backwards compatibility, but are not required. The script uses the metadata
 rows only to attach generated picks to the correct micrograph UID, path, shape,
 pixel size, and exposure group. It then writes:
 
+For the complete Prestin dataset, use the `J80_exposures_accepted` export:
+
+```text
+metadata .cs:  /nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/exports/groups/J80_exposures_accepted/J80_exposures_accepted_exported.cs
+metadata .csg: /nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/exports/groups/J80_exposures_accepted/J80_exposures_accepted_exported.csg
+```
+
 ```text
 /path/to/segmentation_run/vesicle_membrane_picks/
   vesicle_membrane_picks.cs

@@ -191,6 +191,43 @@ Group job, then use the imported particle locations for extraction. By default,
 QC output includes pick overlays under `overlays/` and standalone membrane-band
 mask PNGs under `masks/`.
 
+## Offline membrane-pick export
+
+If CryoSPARC blob picking is not usable, generate fresh particle locations
+directly from filtered Vesicle Picker masks without connecting to CryoSPARC:
+
+```bash
+python segmentation_integration/scripts/generate_vesicle_membrane_picks.py \
+  --dataset raw \
+  --vesicle-mask-dir /path/to/segmentation_run/vesicle_masks_filtered \
+  --output-dir /path/to/segmentation_run/vesicle_membrane_picks \
+  --psize-a 1.068 \
+  --downsample 4 \
+  --box-size-a 100 \
+  --dilation-radius-a 0 \
+  --mode edge
+```
+
+The script uses the exported particle `.cs/.csg` from the dataset preset as a
+metadata template, then writes:
+
+```text
+/path/to/segmentation_run/vesicle_membrane_picks/
+  vesicle_membrane_picks.cs
+  vesicle_membrane_picks.csg
+  vesicle_membrane_picks_summary.json
+```
+
+Import `vesicle_membrane_picks.csg` with CryoSPARC's Import Result Group job.
+Connect the imported particle locations to Extract From Micrographs with the
+same curated/CTF-estimated micrographs used for Vesicle Picker, then continue
+with 2D classification and downstream cleanup.
+
+Picking density is controlled by `--box-size-a`, in Angstrom. Smaller values
+produce denser membrane picks. Positive `--dilation-radius-a` picks outside the
+vesicle mask boundary; negative values pick inside it. Use `--mode edge` for
+membrane-contour picks or `--mode surface` for filled-mask picks.
+
 To regenerate overlays from existing outputs:
 
 ```bash

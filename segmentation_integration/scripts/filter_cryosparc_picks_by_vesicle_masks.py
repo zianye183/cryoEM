@@ -197,6 +197,7 @@ def render_overlays(args: argparse.Namespace, particles: np.ndarray, result, low
     for row in result.particle_rows:
         rows_by_uid.setdefault(int(row["micrograph_uid"]), []).append(row)
     written = 0
+    skipped_unresolved = []
     overlays_dir = args.output_dir / "overlays"
     masks_dir = args.output_dir / "masks"
     for uid in sorted(rows_by_uid):
@@ -207,17 +208,21 @@ def render_overlays(args: argparse.Namespace, particles: np.ndarray, result, low
         if band is None:
             continue
         stem = Path(decode_path(rows[0]["micrograph_path"])).stem
+        try:
+            micrograph_path = resolve_micrograph_path(
+                str(rows[0]["micrograph_path"]),
+                args.micrographs_dir,
+                micrograph_index,
+            )
+        except FileNotFoundError as exc:
+            skipped_unresolved.append(str(exc))
+            continue
         if not args.skip_mask_pngs:
             render_mask_png(
                 output_path=masks_dir / f"{stem}_membrane_band_mask.png",
                 membrane_band=band,
                 title=f"{stem} membrane band",
             )
-        micrograph_path = resolve_micrograph_path(
-            str(rows[0]["micrograph_path"]),
-            args.micrographs_dir,
-            micrograph_index,
-        )
         particle_indices = [int(row["row_index"]) for row in rows]
         original_xy = np.asarray([particle_fullres_xy(particles[index]) for index in particle_indices], dtype=float)
         kept_indices = [int(row["row_index"]) for row in rows if row["status"] == "kept"]
@@ -237,6 +242,14 @@ def render_overlays(args: argparse.Namespace, particles: np.ndarray, result, low
             max_picks_per_class=args.max_picks_per_class,
         )
         written += 1
+    if skipped_unresolved:
+        examples = "\n".join(f"  - {message}" for message in skipped_unresolved[:5])
+        extra = "" if len(skipped_unresolved) <= 5 else f"\n  ... {len(skipped_unresolved) - 5} more"
+        print(
+            f"Warning: skipped {len(skipped_unresolved)} overlay(s) because micrograph files could not be resolved:\n"
+            f"{examples}{extra}",
+            file=sys.stderr,
+        )
 
 
 if __name__ == "__main__":

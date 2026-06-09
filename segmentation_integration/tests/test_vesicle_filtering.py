@@ -1,13 +1,16 @@
 import pickle
 import tempfile
 import unittest
+from contextlib import redirect_stderr
 from concurrent.futures import ProcessPoolExecutor
+from types import SimpleNamespace
 from pathlib import Path
+from io import StringIO
 
 import numpy as np
 
 from segmentation_integration.filtering import filter_particles_by_masks, particle_mask_coordinate
-from segmentation_integration.scripts.filter_cryosparc_picks_by_vesicle_masks import render_progress_bar
+from segmentation_integration.scripts.filter_cryosparc_picks_by_vesicle_masks import render_overlays, render_progress_bar
 from segmentation_integration.vesicle_masks import build_membrane_band, load_vesicle_masks
 
 
@@ -151,6 +154,39 @@ class VesicleFilteringTests(unittest.TestCase):
         bar = render_progress_bar(2, 4, width=10)
 
         self.assertEqual(bar, "[#####-----] 2/4")
+
+    def test_render_overlays_skips_unresolved_micrograph_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            mask_dir = root / "masks"
+            micrographs_dir = root / "micrographs"
+            mask_dir.mkdir()
+            micrographs_dir.mkdir()
+            write_prime_mask(mask_dir / "7_vesicles_filtered.pkl")
+            particles = make_particles()
+            result = filter_particles_by_masks(
+                particles,
+                vesicle_mask_dir=mask_dir,
+                psize_a=1.0,
+                downsample=10,
+                membrane_band_a=10.0,
+            )
+            args = SimpleNamespace(
+                micrographs_dir=micrographs_dir,
+                output_dir=root / "out",
+                max_overlays=1,
+                skip_mask_pngs=False,
+                downsample=10,
+                display_downsample=4,
+                max_picks_per_class=500,
+            )
+
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                render_overlays(args, particles, result, (1, 99))
+
+            self.assertFalse((root / "out" / "overlays").exists())
+            self.assertIn("skipped 1 overlay", stderr.getvalue())
 
 
 if __name__ == "__main__":

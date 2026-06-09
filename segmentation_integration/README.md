@@ -186,6 +186,20 @@ python segmentation_integration/scripts/filter_cryosparc_picks_by_vesicle_masks.
   --max-overlays 10
 ```
 
+For blob-picker picks split across multiple CryoSPARC result groups, pass each
+particle export directory and keep the same single output directory:
+
+```bash
+python segmentation_integration/scripts/filter_cryosparc_picks_by_vesicle_masks.py \
+  --particle-export-dir /path/to/J101_particles /path/to/J102_particles /path/to/J103_particles \
+  --vesicle-mask-dir /path/to/filter_vesicles_outputs \
+  --micrographs-dir /path/to/micrographs \
+  --output-dir /path/to/filter_output \
+  --psize-a 1.068 \
+  --downsample 4 \
+  --membrane-band-a 40
+```
+
 Import the resulting `filtered_particles.csg` with CryoSPARC's Import Result
 Group job, then use the imported particle locations for extraction. By default,
 QC output includes pick overlays under `overlays/` and standalone membrane-band

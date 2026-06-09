@@ -4,7 +4,36 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from segmentation_integration.cryovia_runner import configure_cryovia_home, _runtime_model_directory
+import h5py
+
+from segmentation_integration.cryovia_runner import (
+    _has_keras_v3_vars_group,
+    _prepare_cryovia_weights,
+    _runtime_model_directory,
+    configure_cryovia_home,
+)
+
+
+class FakeBuiltKerasModel:
+    def __init__(self) -> None:
+        self.loaded_from = None
+        self.saved_to = None
+
+    def load_weights(self, path: Path) -> None:
+        self.loaded_from = path
+
+    def save_weights(self, path: Path) -> None:
+        self.saved_to = path
+        with h5py.File(path, "w") as handle:
+            handle.create_group("vars")
+
+
+class FakeCryoviaModel:
+    def __init__(self) -> None:
+        self.built_model = FakeBuiltKerasModel()
+
+    def build_model(self) -> FakeBuiltKerasModel:
+        return self.built_model
 
 
 class CryoviaRunnerTests(unittest.TestCase):
@@ -40,6 +69,31 @@ class CryoviaRunnerTests(unittest.TestCase):
             self.assertEqual(model_dir, cryovia_home / "SegmentationModels" / "custom_model")
             self.assertTrue((model_dir / "Segmentator.pickle").exists())
             self.assertTrue((model_dir / "best.weights.h5").exists())
+
+    def test_has_keras_v3_vars_group_detects_new_weight_format(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            weights_path = Path(tmp) / "best.weights.h5"
+            with h5py.File(weights_path, "w") as handle:
+                handle.create_group("vars")
+
+            self.assertTrue(_has_keras_v3_vars_group(weights_path))
+
+    def test_prepare_cryovia_weights_converts_legacy_weights(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            weights_path = root / "best.weights.h5"
+            legacy_weights_path = root / "best_weights.h5"
+            with h5py.File(weights_path, "w") as handle:
+                handle.create_group("model_weights")
+            with h5py.File(legacy_weights_path, "w") as handle:
+                handle.create_group("model_weights")
+            model = FakeCryoviaModel()
+
+            _prepare_cryovia_weights(model=model, weights_path=weights_path, legacy_weights_path=legacy_weights_path)
+
+            self.assertEqual(model.built_model.loaded_from, legacy_weights_path)
+            self.assertEqual(model.built_model.saved_to, weights_path)
+            self.assertTrue(_has_keras_v3_vars_group(weights_path))
 
 
 if __name__ == "__main__":

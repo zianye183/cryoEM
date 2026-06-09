@@ -118,14 +118,36 @@ def _load_segmentation_model(model: str | Path):
     legacy_weights_path = model_dir / "best_weights.h5"
     if not pickle_path.exists():
         raise FileNotFoundError(f"CryoVIA model pickle not found: {pickle_path}")
-    if not weights_path.exists() and legacy_weights_path.exists():
-        shutil.copy(legacy_weights_path, weights_path)
-    if not weights_path.exists():
-        raise FileNotFoundError(f"CryoVIA model weights not found: {weights_path}")
     loaded = segmentationModelFactory(filepath=pickle_path)
     loaded.config.name = model_dir.name
+    _prepare_cryovia_weights(model=loaded, weights_path=weights_path, legacy_weights_path=legacy_weights_path)
     loaded.print = print
     return loaded
+
+
+def _prepare_cryovia_weights(*, model, weights_path: Path, legacy_weights_path: Path) -> None:
+    if _has_keras_v3_vars_group(weights_path):
+        return
+    if legacy_weights_path.exists():
+        built_model = model.build_model()
+        built_model.load_weights(legacy_weights_path)
+        built_model.save_weights(weights_path)
+        return
+    if weights_path.exists():
+        return
+    raise FileNotFoundError(f"CryoVIA model weights not found: {weights_path}")
+
+
+def _has_keras_v3_vars_group(path: Path) -> bool:
+    if not path.exists():
+        return False
+    try:
+        import h5py
+
+        with h5py.File(path, "r") as handle:
+            return "vars" in handle
+    except OSError:
+        return False
 
 
 def _runtime_model_directory(*, model: str | Path, cryovia_home: Path) -> Path:

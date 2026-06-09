@@ -38,6 +38,23 @@ def make_source_particles() -> np.ndarray:
     return arr
 
 
+def make_source_exposures() -> np.ndarray:
+    dtype = [
+        ("uid", "<u8"),
+        ("micrograph_blob/path", "S128"),
+        ("micrograph_blob/shape", "<u4", (2,)),
+        ("micrograph_blob/psize_A", "<f4"),
+        ("ctf/exp_group_id", "<u4"),
+    ]
+    arr = np.zeros(2, dtype=dtype)
+    arr["uid"] = [7, 8]
+    arr["micrograph_blob/path"] = [b"J3/motioncorrected/mic_a.mrc", b"J3/motioncorrected/mic_b.mrc"]
+    arr["micrograph_blob/shape"] = [(20, 20), (20, 20)]
+    arr["micrograph_blob/psize_A"] = [1.0, 1.0]
+    arr["ctf/exp_group_id"] = [3, 4]
+    return arr
+
+
 def square_mask() -> dict[str, np.ndarray]:
     segmentation = np.zeros((10, 10), dtype=bool)
     segmentation[2:8, 2:8] = True
@@ -150,6 +167,45 @@ class VesicleMembranePickTests(unittest.TestCase):
         self.assertEqual(summary["micrographs"][0]["micrograph_uid"], 7)
         self.assertEqual(summary["micrographs"][1]["micrograph_uid"], 8)
         self.assertEqual(summary["micrographs"][1]["status"], "missing_mask")
+
+    def test_export_vesicle_membrane_picks_uses_exposure_metadata_without_particles(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_cs = root / "exposures.cs"
+            source_csg = root / "exposures.csg"
+            mask_dir = root / "masks"
+            output_dir = root / "out"
+            mask_dir.mkdir()
+            with source_cs.open("wb") as handle:
+                np.save(handle, make_source_exposures())
+            source_csg.write_text(json.dumps({"files": [{"path": str(source_cs)}]}))
+            write_prime_mask(mask_dir / "7_vesicles_filtered.pkl")
+
+            outputs = export_vesicle_membrane_picks(
+                metadata_cs=source_cs,
+                metadata_csg=source_csg,
+                vesicle_mask_dir=mask_dir,
+                output_dir=output_dir,
+                psize_a=1.0,
+                downsample=2,
+                box_size_a=4.0,
+                dilation_radius_a=0.0,
+                mode="edge",
+            )
+
+            generated = np.load(outputs.picks_cs, allow_pickle=False)
+            patched_csg = json.loads(outputs.picks_csg.read_text())
+            summary = json.loads(outputs.summary_json.read_text())
+
+        self.assertGreater(len(generated), 0)
+        self.assertEqual(set(generated["location/micrograph_uid"].tolist()), {7})
+        self.assertEqual(set(generated["location/micrograph_path"].tolist()), {b"J3/motioncorrected/mic_a.mrc"})
+        self.assertEqual(set(generated["location/exp_group_id"].tolist()), {3})
+        self.assertEqual(set(generated["location/micrograph_psize_A"].tolist()), {1.0})
+        self.assertEqual(patched_csg["files"][0]["path"], str(outputs.picks_cs))
+        self.assertEqual(summary["inputs"]["metadata_cs"], str(source_cs))
+        self.assertEqual(summary["inputs"]["metadata_kind"], "exposure")
+        self.assertEqual(summary["missing_mask_count"], 1)
 
 
 if __name__ == "__main__":

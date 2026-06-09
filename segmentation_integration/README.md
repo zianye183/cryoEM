@@ -198,7 +198,8 @@ directly from filtered Vesicle Picker masks without connecting to CryoSPARC:
 
 ```bash
 python segmentation_integration/scripts/generate_vesicle_membrane_picks.py \
-  --dataset raw \
+  --metadata-cs /path/to/exposures_accepted.cs \
+  --metadata-csg /path/to/exposures_accepted.csg \
   --vesicle-mask-dir /path/to/segmentation_run/vesicle_masks_filtered \
   --output-dir /path/to/segmentation_run/vesicle_membrane_picks \
   --psize-a 1.068 \
@@ -208,8 +209,11 @@ python segmentation_integration/scripts/generate_vesicle_membrane_picks.py \
   --mode edge
 ```
 
-The script uses the exported particle `.cs/.csg` from the dataset preset as a
-metadata template, then writes:
+The metadata `.cs/.csg` can be an exported CryoSPARC exposure/micrograph result
+group, such as `exposures_accepted`. Particle exports are also accepted for
+backwards compatibility, but are not required. The script uses the metadata
+rows only to attach generated picks to the correct micrograph UID, path, shape,
+pixel size, and exposure group. It then writes:
 
 ```text
 /path/to/segmentation_run/vesicle_membrane_picks/

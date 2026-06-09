@@ -46,6 +46,18 @@ def load_particles_cs(path: Path) -> np.ndarray:
     return arr
 
 
+def load_particles_cs_many(paths: list[Path] | tuple[Path, ...]) -> np.ndarray:
+    """Load and concatenate one or more compatible CryoSPARC particle `.cs` files."""
+    if not paths:
+        raise ValueError("At least one particle .cs file is required")
+    arrays = [load_particles_cs(path) for path in paths]
+    dtype = arrays[0].dtype
+    mismatched = [str(path) for path, arr in zip(paths, arrays) if arr.dtype != dtype]
+    if mismatched:
+        raise ValueError("Particle .cs files have incompatible schemas: " + ", ".join(mismatched))
+    return np.concatenate(arrays)
+
+
 def write_cs(path: Path, rows: np.ndarray) -> None:
     """Write a structured array to a `.cs` path without appending `.npy`."""
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -96,6 +96,30 @@ class SlurmPipelineTests(unittest.TestCase):
         self.assertFalse((root / "01_draco_array.sbatch").exists())
         self.assertFalse((root / "03_filter_merge.sbatch").exists())
 
+    def test_write_slurm_scripts_can_filter_from_multiple_particle_export_dirs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            scripts = write_slurm_scripts(
+                output_dir=root,
+                manifest=Path("/runs/micrographs.tsv"),
+                micrograph_count=100,
+                denoised_dir=Path("/runs/draco"),
+                stages=("filter",),
+                segmentation_run_dir=Path("/runs/segmentation"),
+                filtered_output_dir=Path("/runs/filtered_particles"),
+                particle_export_dirs=[
+                    Path("/exports/groups/J101_particles"),
+                    Path("/exports/groups/J102_particles"),
+                ],
+                micrographs_dir=Path("/runs/draco"),
+            )
+
+            filter_script = scripts["filter_merge"].read_text()
+
+        self.assertIn("--particle-export-dir /exports/groups/J101_particles /exports/groups/J102_particles", filter_script)
+        self.assertNotIn("--particles-cs", filter_script)
+        self.assertIn("--output-dir /runs/filtered_particles", filter_script)
+
 
 if __name__ == "__main__":
     unittest.main()

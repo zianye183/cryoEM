@@ -34,8 +34,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--denoised-dir", type=Path, required=True)
     parser.add_argument("--segmentation-run-dir", type=Path)
     parser.add_argument("--filtered-output-dir", type=Path)
-    parser.add_argument("--particles-cs", type=Path)
-    parser.add_argument("--particles-csg", type=Path)
+    parser.add_argument("--particle-export-dir", type=Path, nargs="+")
+    parser.add_argument("--particles-cs", type=Path, nargs="+")
+    parser.add_argument("--particles-csg", type=Path, nargs="+")
     parser.add_argument("--micrographs-dir", type=Path)
     parser.add_argument("--vesicle-picker-dir", type=Path)
     parser.add_argument("--draco-repo", type=Path, default=DEFAULT_DRACO_REPO)
@@ -73,9 +74,15 @@ def validate_stage_args(args: argparse.Namespace, parser: argparse.ArgumentParse
             if getattr(args, name) is None:
                 missing.append("--" + name.replace("_", "-"))
     if "filter" in args.stages:
-        for name in ("segmentation_run_dir", "filtered_output_dir", "particles_cs", "particles_csg", "micrographs_dir"):
+        for name in ("segmentation_run_dir", "filtered_output_dir", "micrographs_dir"):
             if getattr(args, name) is None:
                 missing.append("--" + name.replace("_", "-"))
+        if args.particle_export_dir is None and (args.particles_cs is None or args.particles_csg is None):
+            missing.append("--particle-export-dir or both --particles-cs and --particles-csg")
+        if args.particle_export_dir is not None and (args.particles_cs is not None or args.particles_csg is not None):
+            parser.error("--particle-export-dir cannot be combined with --particles-cs or --particles-csg")
+        if args.particles_cs is not None and args.particles_csg is not None and len(args.particles_cs) != len(args.particles_csg):
+            parser.error("--particles-cs and --particles-csg must provide the same number of paths")
     if missing:
         parser.error("missing arguments for selected stages: " + ", ".join(sorted(set(missing))))
 
@@ -103,8 +110,9 @@ def write_slurm_scripts(
     denoised_dir: Path,
     segmentation_run_dir: Path | None = None,
     filtered_output_dir: Path | None = None,
-    particles_cs: Path | None = None,
-    particles_csg: Path | None = None,
+    particle_export_dirs: Path | Sequence[Path] | None = None,
+    particles_cs: Path | Sequence[Path] | None = None,
+    particles_csg: Path | Sequence[Path] | None = None,
     micrographs_dir: Path | None = None,
     vesicle_picker_dir: Path | None = None,
     stages: Sequence[str] = ("draco", "sam", "filter"),
@@ -126,6 +134,9 @@ def write_slurm_scripts(
 ) -> dict[str, Path]:
     """Write Slurm scripts and return their paths by stage name."""
     selected_stages = normalize_stages(stages)
+    particle_export_dirs_seq = normalize_path_sequence(particle_export_dirs)
+    particles_cs_seq = normalize_path_sequence(particles_cs)
+    particles_csg_seq = normalize_path_sequence(particles_csg)
     output_dir.mkdir(parents=True, exist_ok=True)
     logs_dir = output_dir / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
@@ -189,10 +200,14 @@ def write_slurm_scripts(
         require_paths(
             segmentation_run_dir=segmentation_run_dir,
             filtered_output_dir=filtered_output_dir,
-            particles_cs=particles_cs,
-            particles_csg=particles_csg,
             micrographs_dir=micrographs_dir,
         )
+        if particle_export_dirs_seq is None and (particles_cs_seq is None or particles_csg_seq is None):
+            raise ValueError("Missing required particle sources: particle_export_dirs or particles_cs/particles_csg")
+        if particle_export_dirs_seq is not None and (particles_cs_seq is not None or particles_csg_seq is not None):
+            raise ValueError("particle_export_dirs cannot be combined with particles_cs or particles_csg")
+        if particles_cs_seq is not None and particles_csg_seq is not None and len(particles_cs_seq) != len(particles_csg_seq):
+            raise ValueError("particles_cs and particles_csg must have the same length")
         scripts["filter_merge"] = output_dir / "03_filter_merge.sbatch"
         scripts["filter_merge"].write_text(
             render_filter_merge_script(
@@ -202,8 +217,9 @@ def write_slurm_scripts(
                 time=time,
                 logs_dir=logs_dir,
                 project_root=project_root,
-                particles_cs=particles_cs,
-                particles_csg=particles_csg,
+                particle_export_dirs=particle_export_dirs_seq,
+                particles_cs=particles_cs_seq,
+                particles_csg=particles_csg_seq,
                 vesicle_mask_dir=segmentation_run_dir / "vesicle_masks_filtered",
                 micrographs_dir=micrographs_dir,
                 filtered_output_dir=filtered_output_dir,
@@ -218,6 +234,14 @@ def require_paths(**paths: Path | None) -> None:
     missing = [name for name, value in paths.items() if value is None]
     if missing:
         raise ValueError("Missing required paths: " + ", ".join(sorted(missing)))
+
+
+def normalize_path_sequence(paths: Path | Sequence[Path] | None) -> tuple[Path, ...] | None:
+    if paths is None:
+        return None
+    if isinstance(paths, Path):
+        return (paths,)
+    return tuple(paths)
 
 
 def render_header(
@@ -369,12 +393,22 @@ def render_filter_merge_script(
     time: str,
     logs_dir: Path,
     project_root: Path,
-    particles_cs: Path,
-    particles_csg: Path,
+    particle_export_dirs: Sequence[Path] | None,
+    particles_cs: Sequence[Path] | None,
+    particles_csg: Sequence[Path] | None,
     vesicle_mask_dir: Path,
     micrographs_dir: Path,
     filtered_output_dir: Path,
 ) -> str:
+    if particle_export_dirs is not None:
+        particle_args = f"  --particle-export-dir {quote_join(particle_export_dirs)} \\\n"
+    elif particles_cs is not None and particles_csg is not None:
+        particle_args = (
+            f"  --particles-cs {quote_join(particles_cs)} \\\n"
+            f"  --particles-csg {quote_join(particles_csg)} \\\n"
+        )
+    else:
+        raise ValueError("Missing particle sources")
     return (
         render_header(
             job_name="filter_merge",
@@ -386,15 +420,17 @@ def render_filter_merge_script(
         )
         + render_env_exports()
         + f"""python {quote(project_root / "segmentation_integration" / "scripts" / "filter_cryosparc_picks_by_vesicle_masks.py")} \\
-  --particles-cs {quote(particles_cs)} \\
-  --particles-csg {quote(particles_csg)} \\
+{particle_args.rstrip()}
   --vesicle-mask-dir {quote(vesicle_mask_dir)} \\
   --micrographs-dir {quote(micrographs_dir)} \\
   --output-dir {quote(filtered_output_dir)} \\
-  --skip-mask-pngs \\
-  --progress-every 1
+  --skip-mask-pngs
 """
     )
+
+
+def quote_join(values: Sequence[Path]) -> str:
+    return " ".join(quote(value) for value in values)
 
 
 def main() -> None:
@@ -407,6 +443,7 @@ def main() -> None:
         stages=args.stages,
         segmentation_run_dir=args.segmentation_run_dir,
         filtered_output_dir=args.filtered_output_dir,
+        particle_export_dirs=args.particle_export_dir,
         particles_cs=args.particles_cs,
         particles_csg=args.particles_csg,
         micrographs_dir=args.micrographs_dir,

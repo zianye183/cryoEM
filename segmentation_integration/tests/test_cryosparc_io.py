@@ -8,6 +8,7 @@ import numpy as np
 from segmentation_integration.cryosparc_io import (
     REQUIRED_LOCATION_FIELDS,
     decode_path,
+    load_particles_cs_many,
     load_particles_cs,
     patch_csg_cs_path,
     resolve_micrograph_path,
@@ -54,6 +55,34 @@ class CryosparcIoTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "missing required fields"):
                 load_particles_cs(path)
+
+    def test_load_particles_cs_many_concatenates_compatible_sources(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = root / "batch_1.cs"
+            second = root / "batch_2.cs"
+            particles = make_particles()
+            with first.open("wb") as handle:
+                np.save(handle, particles[[0]])
+            with second.open("wb") as handle:
+                np.save(handle, particles[[1]])
+
+            loaded = load_particles_cs_many([first, second])
+
+        self.assertEqual([int(row["uid"]) for row in loaded], [10, 11])
+
+    def test_load_particles_cs_many_rejects_incompatible_sources(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = root / "batch_1.cs"
+            second = root / "batch_2.cs"
+            with first.open("wb") as handle:
+                np.save(handle, make_particles())
+            with second.open("wb") as handle:
+                np.save(handle, np.zeros(1, dtype=[("location/center_x_frac", "<f4")]))
+
+            with self.assertRaisesRegex(ValueError, "missing required fields"):
+                load_particles_cs_many([first, second])
 
     def test_write_cs_preserves_dtype_and_rows(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

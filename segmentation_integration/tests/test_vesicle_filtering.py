@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 
 from segmentation_integration.filtering import filter_particles_by_masks, particle_mask_coordinate
+from segmentation_integration.scripts.filter_cryosparc_picks_by_vesicle_masks import render_progress_bar
 from segmentation_integration.vesicle_masks import build_membrane_band, load_vesicle_masks
 
 
@@ -95,6 +96,28 @@ class VesicleFilteringTests(unittest.TestCase):
         self.assertEqual(result.reason_counts["outside_membrane_band"], 1)
         self.assertEqual(result.reason_counts["out_of_bounds"], 1)
         self.assertEqual(result.reason_counts["missing_mask"], 1)
+
+    def test_filter_particles_by_masks_reports_progress_per_micrograph(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            mask_dir = Path(tmp)
+            write_prime_mask(mask_dir / "7_vesicles_filtered.pkl")
+            progress = []
+
+            filter_particles_by_masks(
+                make_particles(),
+                vesicle_mask_dir=mask_dir,
+                psize_a=1.0,
+                downsample=10,
+                membrane_band_a=10.0,
+                progress_callback=lambda completed, total: progress.append((completed, total)),
+            )
+
+        self.assertEqual(progress, [(1, 2), (2, 2)])
+
+    def test_render_progress_bar_shows_completed_and_total(self) -> None:
+        bar = render_progress_bar(2, 4, width=10)
+
+        self.assertEqual(bar, "[#####-----] 2/4")
 
 
 if __name__ == "__main__":

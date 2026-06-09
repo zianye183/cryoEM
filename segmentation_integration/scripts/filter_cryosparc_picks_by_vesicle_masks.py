@@ -53,6 +53,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Do not render standalone membrane-band mask PNGs during filtering.",
     )
+    parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable the one-line micrograph progress bar.",
+    )
     args = parser.parse_args()
     particle_source_supplied = args.dataset is not None or args.particle_export_dir is not None or args.particles_cs is not None
     if not particle_source_supplied:
@@ -97,12 +102,14 @@ def main() -> None:
     validate_particle_sources(particle_cs_paths, particle_csg_paths)
     low_high = parse_percentiles(args.contrast_percentiles)
     particles = load_particles_cs_many(particle_cs_paths)
+    progress_callback = None if args.no_progress else print_micrograph_progress
     result = filter_particles_by_masks(
         particles,
         vesicle_mask_dir=args.vesicle_mask_dir,
         psize_a=args.psize_a,
         downsample=args.downsample,
         membrane_band_a=args.membrane_band_a,
+        progress_callback=progress_callback,
     )
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -164,6 +171,21 @@ def validate_particle_sources(particle_cs_paths: list[Path], particle_csg_paths:
             f"Expected the same number of .cs and .csg inputs, got {len(particle_cs_paths)} .cs and "
             f"{len(particle_csg_paths)} .csg"
         )
+
+
+def render_progress_bar(completed: int, total: int, width: int = 30) -> str:
+    if total <= 0:
+        return f"[{'-' * width}] 0/0"
+    completed = max(0, min(completed, total))
+    filled = int(round(width * completed / total))
+    return f"[{'#' * filled}{'-' * (width - filled)}] {completed}/{total}"
+
+
+def print_micrograph_progress(completed: int, total: int) -> None:
+    sys.stderr.write("\rFiltering micrographs " + render_progress_bar(completed, total))
+    if completed >= total:
+        sys.stderr.write("\n")
+    sys.stderr.flush()
 
 
 def render_overlays(args: argparse.Namespace, particles: np.ndarray, result, low_high: tuple[float, float]) -> None:

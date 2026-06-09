@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -51,17 +52,22 @@ def filter_particles_by_masks(
     psize_a: float,
     downsample: int,
     membrane_band_a: float,
+    progress_callback: Callable[[int, int], None] | None = None,
 ) -> FilterResult:
     """Split particles into kept/rejected arrays using Vesicle Picker masks."""
     radius_px = membrane_radius_px(membrane_band_a, psize_a, downsample)
     bands: dict[int, np.ndarray] = {}
     missing_uids: set[int] = set()
-    keep_flags: list[bool] = []
-    particle_rows: list[dict[str, object]] = []
-    reason_counts: Counter = Counter()
-
+    micrograph_indices: dict[int, list[int]] = {}
     for index, particle in enumerate(particles):
         uid = int(particle["location/micrograph_uid"])
+        micrograph_indices.setdefault(uid, []).append(index)
+    keep_array = np.zeros(len(particles), dtype=bool)
+    particle_rows_by_index: list[dict[str, object] | None] = [None] * len(particles)
+    reason_counts: Counter = Counter()
+    total_micrographs = len(micrograph_indices)
+
+    for completed, (uid, indices) in enumerate(micrograph_indices.items(), start=1):
         if uid not in bands and uid not in missing_uids:
             mask_path = mask_path_for_uid(vesicle_mask_dir, uid)
             if mask_path.exists():
@@ -70,32 +76,33 @@ def filter_particles_by_masks(
             else:
                 missing_uids.add(uid)
 
-        x_full, y_full = particle_fullres_xy(particle)
-        y_mask, x_mask = particle_mask_coordinate(particle, downsample)
-        reason = "kept"
-        keep = False
-        if uid in missing_uids:
-            reason = "missing_mask"
-        else:
-            band = bands[uid]
-            shape = particle["location/micrograph_shape"]
-            ny = int(shape[0])
-            nx = int(shape[1])
-            if band.size == 0:
-                reason = "empty_mask"
-            elif not (0 <= x_full < nx and 0 <= y_full < ny):
-                reason = "out_of_bounds"
-            elif not (0 <= y_mask < band.shape[0] and 0 <= x_mask < band.shape[1]):
-                reason = "out_of_bounds"
-            elif bool(band[y_mask, x_mask]):
-                keep = True
+        for index in indices:
+            particle = particles[index]
+            x_full, y_full = particle_fullres_xy(particle)
+            y_mask, x_mask = particle_mask_coordinate(particle, downsample)
+            reason = "kept"
+            keep = False
+            if uid in missing_uids:
+                reason = "missing_mask"
             else:
-                reason = "outside_membrane_band"
+                band = bands[uid]
+                shape = particle["location/micrograph_shape"]
+                ny = int(shape[0])
+                nx = int(shape[1])
+                if band.size == 0:
+                    reason = "empty_mask"
+                elif not (0 <= x_full < nx and 0 <= y_full < ny):
+                    reason = "out_of_bounds"
+                elif not (0 <= y_mask < band.shape[0] and 0 <= x_mask < band.shape[1]):
+                    reason = "out_of_bounds"
+                elif bool(band[y_mask, x_mask]):
+                    keep = True
+                else:
+                    reason = "outside_membrane_band"
 
-        keep_flags.append(keep)
-        reason_counts[reason] += 1
-        particle_rows.append(
-            {
+            keep_array[index] = keep
+            reason_counts[reason] += 1
+            particle_rows_by_index[index] = {
                 "row_index": index,
                 "micrograph_uid": uid,
                 "micrograph_path": decode_path(particle["location/micrograph_path"]),
@@ -106,9 +113,10 @@ def filter_particles_by_masks(
                 "status": "kept" if keep else "rejected",
                 "reason": reason,
             }
-        )
+        if progress_callback is not None:
+            progress_callback(completed, total_micrographs)
 
-    keep_array = np.asarray(keep_flags, dtype=bool)
+    particle_rows = [row for row in particle_rows_by_index if row is not None]
     micrograph_rows = summarize_by_micrograph(particle_rows)
     return FilterResult(
         kept=particles[keep_array],

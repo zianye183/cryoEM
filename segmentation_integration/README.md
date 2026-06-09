@@ -200,6 +200,34 @@ python segmentation_integration/scripts/filter_cryosparc_picks_by_vesicle_masks.
   --membrane-band-a 40
 ```
 
+Current Prestin DRACO-only particle-location run:
+
+```bash
+source "$(conda info --base)/etc/profile.d/conda.sh"
+conda activate /nfs/bartesaghilab2/mm1229/conda-envs/vesicle
+
+python segmentation_integration/scripts/filter_cryosparc_picks_by_vesicle_masks.py \
+  --particle-export-dir \
+    /nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/exports/groups/J111_particles \
+    /nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/exports/groups/J112_particles \
+    /nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/exports/groups/J113_particles \
+    /nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/exports/groups/J114_particles \
+    /nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/exports/groups/J115_particles \
+    /nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/exports/groups/J116_particles \
+    /nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/exports/groups/J117_particles \
+    /nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/exports/groups/J118_particles \
+    /nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/exports/groups/J119_particles \
+    /nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/exports/groups/J120_particles \
+  --vesicle-mask-dir /nfs/bartesaghilab2/zy223/data/prestin_draco_only/segmentation/vesicle_masks_filtered \
+  --micrographs-dir /nfs/bartesaghilab2/zy223/data/prestin_draco_only/draco_denoised \
+  --output-dir /nfs/bartesaghilab2/zy223/data/prestin_draco_only/particle_locations \
+  --psize-a 1.068 \
+  --downsample 4 \
+  --membrane-band-a 40 \
+  --max-overlays 10 \
+  --jobs 32
+```
+
 Import the resulting `filtered_particles.csg` with CryoSPARC's Import Result
 Group job, then use the imported particle locations for extraction. By default,
 QC output includes pick overlays under `overlays/` and standalone membrane-band

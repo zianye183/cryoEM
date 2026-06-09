@@ -44,6 +44,7 @@ class SlurmPipelineTests(unittest.TestCase):
         self.assertIn("--skip-existing", sam_script)
         self.assertIn("filter_cryosparc_picks_by_vesicle_masks.py", filter_script)
         self.assertIn("/runs/filtered_particles", filter_script)
+        self.assertIn("--jobs 16", filter_script)
 
     def test_write_slurm_scripts_can_generate_draco_only_without_particles(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -119,6 +120,30 @@ class SlurmPipelineTests(unittest.TestCase):
         self.assertIn("--particle-export-dir /exports/groups/J101_particles /exports/groups/J102_particles", filter_script)
         self.assertNotIn("--particles-cs", filter_script)
         self.assertIn("--output-dir /runs/filtered_particles", filter_script)
+        self.assertIn("--jobs 16", filter_script)
+
+    def test_write_slurm_scripts_can_override_filter_jobs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            scripts = write_slurm_scripts(
+                output_dir=root,
+                manifest=Path("/runs/micrographs.tsv"),
+                micrograph_count=100,
+                denoised_dir=Path("/runs/draco"),
+                stages=("filter",),
+                segmentation_run_dir=Path("/runs/segmentation"),
+                filtered_output_dir=Path("/runs/filtered_particles"),
+                particles_cs=Path("/exports/particles.cs"),
+                particles_csg=Path("/exports/particles.csg"),
+                micrographs_dir=Path("/runs/draco"),
+                cpu_cpus=32,
+                filter_jobs=8,
+            )
+
+            filter_script = scripts["filter_merge"].read_text()
+
+        self.assertIn("#SBATCH -c 32", filter_script)
+        self.assertIn("--jobs 8", filter_script)
 
 
 if __name__ == "__main__":

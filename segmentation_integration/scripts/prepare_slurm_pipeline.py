@@ -52,6 +52,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--gpu-cpus", type=int, default=8)
     parser.add_argument("--gpu-mem", default="64G")
     parser.add_argument("--cpu-cpus", type=int, default=16)
+    parser.add_argument("--filter-jobs", type=int, help="Worker process count for the filter stage. Defaults to --cpu-cpus.")
     parser.add_argument("--cpu-mem", default="64G")
     parser.add_argument("--time", default="12:00:00")
     args = parser.parse_args()
@@ -129,6 +130,7 @@ def write_slurm_scripts(
     gpu_cpus: int = 8,
     gpu_mem: str = "64G",
     cpu_cpus: int = 16,
+    filter_jobs: int | None = None,
     cpu_mem: str = "64G",
     time: str = "12:00:00",
 ) -> dict[str, Path]:
@@ -137,6 +139,7 @@ def write_slurm_scripts(
     particle_export_dirs_seq = normalize_path_sequence(particle_export_dirs)
     particles_cs_seq = normalize_path_sequence(particles_cs)
     particles_csg_seq = normalize_path_sequence(particles_csg)
+    resolved_filter_jobs = filter_jobs if filter_jobs is not None else cpu_cpus
     output_dir.mkdir(parents=True, exist_ok=True)
     logs_dir = output_dir / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
@@ -223,6 +226,7 @@ def write_slurm_scripts(
                 vesicle_mask_dir=segmentation_run_dir / "vesicle_masks_filtered",
                 micrographs_dir=micrographs_dir,
                 filtered_output_dir=filtered_output_dir,
+                jobs=resolved_filter_jobs,
             )
         )
     for path in scripts.values():
@@ -399,6 +403,7 @@ def render_filter_merge_script(
     vesicle_mask_dir: Path,
     micrographs_dir: Path,
     filtered_output_dir: Path,
+    jobs: int,
 ) -> str:
     if particle_export_dirs is not None:
         particle_args = f"  --particle-export-dir {quote_join(particle_export_dirs)} \\\n"
@@ -424,6 +429,7 @@ def render_filter_merge_script(
   --vesicle-mask-dir {quote(vesicle_mask_dir)} \\
   --micrographs-dir {quote(micrographs_dir)} \\
   --output-dir {quote(filtered_output_dir)} \\
+  --jobs {jobs} \\
   --skip-mask-pngs
 """
     )
@@ -461,6 +467,7 @@ def main() -> None:
         gpu_cpus=args.gpu_cpus,
         gpu_mem=args.gpu_mem,
         cpu_cpus=args.cpu_cpus,
+        filter_jobs=args.filter_jobs,
         cpu_mem=args.cpu_mem,
         time=args.time,
     )

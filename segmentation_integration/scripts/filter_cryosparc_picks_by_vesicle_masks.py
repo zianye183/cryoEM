@@ -44,6 +44,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--psize-a", type=float, default=1.068)
     parser.add_argument("--downsample", type=int, default=4)
     parser.add_argument("--membrane-band-a", type=float, default=40.0)
+    parser.add_argument("--jobs", type=int, default=1, help="Number of worker processes to use for micrograph filtering.")
     parser.add_argument("--max-overlays", type=int, default=10)
     parser.add_argument("--display-downsample", type=int, default=4)
     parser.add_argument("--max-picks-per-class", type=int, default=500)
@@ -109,6 +110,7 @@ def main() -> None:
         psize_a=args.psize_a,
         downsample=args.downsample,
         membrane_band_a=args.membrane_band_a,
+        jobs=args.jobs,
         progress_callback=progress_callback,
     )
 
@@ -136,6 +138,7 @@ def main() -> None:
             "psize_a": args.psize_a,
             "downsample": args.downsample,
             "membrane_band_a": args.membrane_band_a,
+            "jobs": args.jobs,
         },
         outputs={
             "filtered_particles_cs": str(filtered_cs),

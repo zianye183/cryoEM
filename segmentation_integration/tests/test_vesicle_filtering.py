@@ -1,6 +1,7 @@
 import pickle
 import tempfile
 import unittest
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -113,6 +114,38 @@ class VesicleFilteringTests(unittest.TestCase):
             )
 
         self.assertEqual(progress, [(1, 2), (2, 2)])
+
+    def test_filter_particles_by_masks_parallel_matches_sequential(self) -> None:
+        try:
+            executor = ProcessPoolExecutor(max_workers=1)
+            executor.shutdown()
+        except PermissionError as exc:
+            self.skipTest(f"process pools are unavailable in this sandbox: {exc}")
+        with tempfile.TemporaryDirectory() as tmp:
+            mask_dir = Path(tmp)
+            write_prime_mask(mask_dir / "7_vesicles_filtered.pkl")
+
+            sequential = filter_particles_by_masks(
+                make_particles(),
+                vesicle_mask_dir=mask_dir,
+                psize_a=1.0,
+                downsample=10,
+                membrane_band_a=10.0,
+                jobs=1,
+            )
+            parallel = filter_particles_by_masks(
+                make_particles(),
+                vesicle_mask_dir=mask_dir,
+                psize_a=1.0,
+                downsample=10,
+                membrane_band_a=10.0,
+                jobs=2,
+            )
+
+        self.assertEqual([int(row["uid"]) for row in parallel.kept], [int(row["uid"]) for row in sequential.kept])
+        self.assertEqual([int(row["uid"]) for row in parallel.rejected], [int(row["uid"]) for row in sequential.rejected])
+        self.assertEqual(parallel.micrograph_rows, sequential.micrograph_rows)
+        self.assertEqual(parallel.reason_counts, sequential.reason_counts)
 
     def test_render_progress_bar_shows_completed_and_total(self) -> None:
         bar = render_progress_bar(2, 4, width=10)

@@ -40,7 +40,7 @@ def get_cryosparc_tools_version() -> str | None:
 
 
 def print_status() -> None:
-    project_uid = env("CRYOSPARC_PROJECT_UID", "CS-prestin")
+    project_uid = env("CRYOSPARC_PROJECT_UID", "P67")
     workspace_uid = env("CRYOSPARC_WORKSPACE_UID", "W1")
     project_dir = Path(env("CRYOSPARC_PROJECT_DIR", str(DEFAULT_PROJECT_DIR)) or DEFAULT_PROJECT_DIR)
     cryosparcm = detect_cryosparcm()
@@ -96,7 +96,7 @@ def print_status() -> None:
 
 
 def print_python_snippet() -> None:
-    project_uid = env("CRYOSPARC_PROJECT_UID", "CS-prestin")
+    project_uid = env("CRYOSPARC_PROJECT_UID", "P67")
     workspace_uid = env("CRYOSPARC_WORKSPACE_UID", "W1")
     print(
         f"""from cryosparc.tools import CryoSPARC

@@ -1,6 +1,7 @@
 # CryoSPARC CLI setup for this project
 
-This repository uses CryoSPARC primarily for Prestin project `CS-prestin`.
+This repository uses CryoSPARC primarily for Prestin project UID `P67`.
+The project storage directory is named `CS-prestin`.
 Large CryoSPARC data live on the HPC under:
 
 ```text
@@ -33,7 +34,7 @@ export CRYOSPARC_HOST=...
 export CRYOSPARC_BASE_PORT=...
 export CRYOSPARC_EMAIL=...
 export CRYOSPARC_PASSWORD='...'
-export CRYOSPARC_PROJECT_UID=CS-prestin
+export CRYOSPARC_PROJECT_UID=P67
 export CRYOSPARC_WORKSPACE_UID=W1
 export CRYOSPARC_PROJECT_DIR=/nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin
 ```
@@ -64,7 +65,7 @@ python scripts/cryosparc_cli_helper.py python-snippet | python
 ```
 
 The helper emits a minimal `cryosparc-tools` script that connects, runs
-`cs.test_connection()`, opens project `CS-prestin`, and opens the configured
+`cs.test_connection()`, opens project `P67`, and opens the configured
 workspace.
 
 ## Use the master-host CLI
@@ -73,7 +74,7 @@ On the CryoSPARC master host:
 
 ```bash
 cryosparcm status
-cryosparcm cli 'print(db.projects.find_one({"uid": "CS-prestin"})["uid"])'
+cryosparcm cli 'print(db.projects.find_one({"uid": "P67"})["uid"])'
 ```
 
 If `cryosparcm` is not on `PATH`, set:
@@ -89,8 +90,8 @@ database inspection on the master host.
 
 ## Project import/export conventions
 
-For CryoSPARC Import Result Group workflows in `CS-prestin`, keep import files
-inside the CryoSPARC project directory:
+For CryoSPARC Import Result Group workflows in project UID `P67`, keep import
+files inside the CryoSPARC project directory `CS-prestin`:
 
 ```bash
 mkdir -p /nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/imports/my_import

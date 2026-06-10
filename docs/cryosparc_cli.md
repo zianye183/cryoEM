@@ -30,14 +30,24 @@ chmod 600 .env.cryosparc
 Then edit `.env.cryosparc`. At minimum set:
 
 ```bash
-export CRYOSPARC_HOST=...
-export CRYOSPARC_BASE_PORT=...
+export CRYOSPARC_BASE_URL=https://hpc-bartesaghi-cryosparc-01.oit.duke.edu
 export CRYOSPARC_EMAIL=...
 export CRYOSPARC_PASSWORD='...'
 export CRYOSPARC_PROJECT_UID=P67
 export CRYOSPARC_WORKSPACE_UID=W1
 export CRYOSPARC_PROJECT_DIR=/nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin
 ```
+
+Use `CRYOSPARC_HOST` and `CRYOSPARC_BASE_PORT` only for a raw CryoSPARC HTTP
+endpoint or an SSH tunnel, such as:
+
+```bash
+export CRYOSPARC_HOST=localhost
+export CRYOSPARC_BASE_PORT=40000
+```
+
+Do not set both `CRYOSPARC_BASE_URL` and `CRYOSPARC_HOST`/`CRYOSPARC_BASE_PORT`
+for the same connection test.
 
 `.env.cryosparc` is ignored by git through the existing `.env.*` rule.
 

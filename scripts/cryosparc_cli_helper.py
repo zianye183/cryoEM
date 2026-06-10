@@ -40,6 +40,9 @@ def get_cryosparc_tools_version() -> str | None:
 
 
 def print_status() -> None:
+    base_url = env("CRYOSPARC_BASE_URL")
+    host = env("CRYOSPARC_HOST")
+    base_port = env("CRYOSPARC_BASE_PORT")
     project_uid = env("CRYOSPARC_PROJECT_UID", "P67")
     workspace_uid = env("CRYOSPARC_WORKSPACE_UID", "W1")
     project_dir = Path(env("CRYOSPARC_PROJECT_DIR", str(DEFAULT_PROJECT_DIR)) or DEFAULT_PROJECT_DIR)
@@ -47,6 +50,11 @@ def print_status() -> None:
     tools_version = get_cryosparc_tools_version()
 
     print("CryoSPARC project defaults")
+    if base_url:
+        print(f"  base URL:      {base_url}")
+    else:
+        print(f"  host:          {host or 'unset'}")
+        print(f"  base port:     {base_port or 'unset'}")
     print(f"  project uid:   {project_uid}")
     print(f"  workspace uid: {workspace_uid}")
     print(f"  project dir:   {project_dir}")
@@ -56,11 +64,10 @@ def print_status() -> None:
     print(f"  cryosparcm:      {cryosparcm or 'not found on PATH or CRYOSPARC_MASTER_DIR'}")
     print()
 
-    missing = [
-        name
-        for name in ("CRYOSPARC_HOST", "CRYOSPARC_BASE_PORT", "CRYOSPARC_EMAIL", "CRYOSPARC_PASSWORD")
-        if not env(name)
-    ]
+    missing = []
+    if not base_url:
+        missing.extend(name for name in ("CRYOSPARC_HOST", "CRYOSPARC_BASE_PORT") if not env(name))
+    missing.extend(name for name in ("CRYOSPARC_EMAIL", "CRYOSPARC_PASSWORD") if not env(name))
     if missing:
         print("Missing cryosparc-tools environment variables:")
         for name in missing:
@@ -98,13 +105,17 @@ def print_status() -> None:
 def print_python_snippet() -> None:
     project_uid = env("CRYOSPARC_PROJECT_UID", "P67")
     workspace_uid = env("CRYOSPARC_WORKSPACE_UID", "W1")
+    if env("CRYOSPARC_BASE_URL"):
+        constructor = 'base_url=os.environ["CRYOSPARC_BASE_URL"],'
+    else:
+        constructor = """host=os.environ["CRYOSPARC_HOST"],
+    base_port=int(os.environ["CRYOSPARC_BASE_PORT"]),"""
     print(
         f"""from cryosparc.tools import CryoSPARC
 import os
 
 cs = CryoSPARC(
-    host=os.environ["CRYOSPARC_HOST"],
-    base_port=int(os.environ["CRYOSPARC_BASE_PORT"]),
+    {constructor}
     email=os.environ["CRYOSPARC_EMAIL"],
     password=os.environ["CRYOSPARC_PASSWORD"],
 )

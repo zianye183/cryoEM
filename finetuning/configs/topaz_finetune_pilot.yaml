@@ -68,7 +68,7 @@ topaz:
         dry_run_first: true
 
     finetune:
-        output_dir: /nfs/bartesaghilab2/zy223/finetuning/results/topaz_finetuned_pilot
+        output_dir: /nfs/bartesaghilab2/zy223/finetuning/results/topaz_finetuned_prestin_unet_l2_lr1e-5
         dry_run_first: true
         learning_rate: 1.0e-5
         alternate_learning_rate: 3.0e-6
@@ -111,7 +111,7 @@ evaluation:
 
 reporting:
     require_command_log: true
-    require_topaz_version: true
+    require_topaz_denoise_help: true
     require_manifest_hashes: true
     require_artifact_notes: true
     decision_labels: [reject, repeat, scale_up]

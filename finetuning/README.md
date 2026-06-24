@@ -36,7 +36,8 @@ zy223/finetuning/
     prepare_pairs.py               # future: build/validate even/odd pair manifests
     split_pairs.py                 # future: train/val/test split by micrograph
     run_topaz_baseline.py          # future: pretrained inference launcher
-    run_topaz_finetune.py          # future: Topaz training launcher
+    run_topaz_finetune.py          # Topaz training launcher
+    run_topaz_finetune_prestin.sh  # canonical Prestin wrapper
     evaluate_denoising.py          # future: metric computation and plots
   results/
     topaz_pretrained_pilot/         # future generated outputs; keep out of git
@@ -119,14 +120,22 @@ python /nfs/bartesaghilab2/zy223/finetuning/scripts/run_topaz_baseline.py \
 Prepare and dry-run the fine-tuning launch command:
 
 ```bash
-python /nfs/bartesaghilab2/zy223/finetuning/scripts/run_topaz_finetune.py \
-  --train-manifest /nfs/bartesaghilab2/zy223/data/finetuning_data/topaz_prestin/train_pairs.tsv \
-  --val-manifest /nfs/bartesaghilab2/zy223/data/finetuning_data/topaz_prestin/val_pairs.tsv \
-  --output-dir /nfs/bartesaghilab2/zy223/finetuning/results/topaz_finetuned_pilot \
-  --dry-run
+/nfs/bartesaghilab2/zy223/finetuning/scripts/run_topaz_finetune_prestin.sh
 ```
 
-This Topaz install exposes Noise2Noise training through `topaz denoise --dir-a ... --dir-b ...`; it does not list a separate `denoise-train` subcommand. Before removing `--dry-run`, confirm `topaz denoise --help` still shows the expected `--dir-a`, `--dir-b`, `--lr`, and `--num-epochs` flags. Use repeated `--extra-arg` for additional Topaz options.
+The wrapper defaults to `DRY_RUN=1`. It creates symlinked Topaz input directories under:
+
+```text
+/nfs/bartesaghilab2/zy223/finetuning/results/topaz_finetuned_prestin_unet_l2_lr1e-5
+```
+
+No MRC data are copied. Promote the same command to a real training run with:
+
+```bash
+DRY_RUN=0 OVERWRITE=1 /nfs/bartesaghilab2/zy223/finetuning/scripts/run_topaz_finetune_prestin.sh
+```
+
+This Topaz install exposes Noise2Noise training through `topaz denoise --dir-a ... --dir-b ...`; it does not list a separate `denoise-train` subcommand. The project wrapper uses Topaz's Python API instead of the raw CLI so validation is taken from the fixed `val_pairs.tsv`, not a random per-example holdout.
 
 ## DRACO Noise2Noise fine-tuning
 

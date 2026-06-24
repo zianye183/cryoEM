@@ -148,10 +148,10 @@ Ignore `__pycache__/`, `.DS_Store`, local virtual environments, external tool ch
 
 ### Fine-tuning inputs and manifests
 
-- Pilot even/odd source data:
-  `/nfs/bartesaghilab/micromon/research-bartesaghilab-06/shared/users/zy223@duke.edu/projects/Prestin-test-WNXj0kBZzgoPdMbE/sp-preprocessing-ghcTLDemYJJ8gcXE/mrc`
-- Topaz pilot manifests:
-  `/nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot`
+- Prestin accepted even/odd source data:
+  `/nfs/bartesaghilab/micromon/research-bartesaghilab-06/shared/users/zy223@duke.edu/projects/Prestin-test-WNXj0kBZzgoPdMbE/sp-preprocessing-gkym1IT0yo4s7y1L/mrc`
+- Topaz accepted-exposure manifests:
+  `/nfs/bartesaghilab2/zy223/data/finetuning_data/topaz_prestin`
 
 ### CryoSPARC exports
 
@@ -268,21 +268,21 @@ Prepare paired even/odd manifests and splits:
 
 ```bash
 python finetuning/scripts/prepare_pairs.py \
-  --limit 300 \
   --skip-metadata
 
 python finetuning/scripts/split_pairs.py \
-  --limit 300 \
-  --train-count 240 \
-  --val-count 30 \
-  --test-count 30
+  --limit 0 \
+  --train-count 11890 \
+  --val-count 1486 \
+  --test-count 1486 \
+  --visual-count 24
 ```
 
 Run pretrained Topaz baseline on held-out pairs:
 
 ```bash
 python finetuning/scripts/run_topaz_baseline.py \
-  --manifest /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/test_pairs.tsv \
+  --manifest /nfs/bartesaghilab2/zy223/data/finetuning_data/topaz_prestin/test_pairs.tsv \
   --output-dir /nfs/bartesaghilab2/zy223/finetuning/results/topaz_pretrained_pilot \
   --dry-run
 ```
@@ -290,11 +290,13 @@ python finetuning/scripts/run_topaz_baseline.py \
 Prepare Topaz fine-tuning:
 
 ```bash
-python finetuning/scripts/run_topaz_finetune.py \
-  --train-manifest /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/train_pairs.tsv \
-  --val-manifest /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/val_pairs.tsv \
-  --output-dir /nfs/bartesaghilab2/zy223/finetuning/results/topaz_finetuned_pilot \
-  --dry-run
+finetuning/scripts/run_topaz_finetune_prestin.sh
+```
+
+The wrapper defaults to `DRY_RUN=1`. Start a real run with:
+
+```bash
+DRY_RUN=0 OVERWRITE=1 finetuning/scripts/run_topaz_finetune_prestin.sh
 ```
 
 Prepare DRACO fine-tuning:
@@ -302,8 +304,8 @@ Prepare DRACO fine-tuning:
 ```bash
 /nfs/bartesaghilab2/zy223/venvs/draco311/bin/python \
   finetuning/scripts/run_draco_finetune.py \
-  --train-manifest /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/train_pairs.tsv \
-  --val-manifest /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/val_pairs.tsv \
+  --train-manifest /nfs/bartesaghilab2/zy223/data/finetuning_data/topaz_prestin/train_pairs.tsv \
+  --val-manifest /nfs/bartesaghilab2/zy223/data/finetuning_data/topaz_prestin/val_pairs.tsv \
   --output-dir /nfs/bartesaghilab2/zy223/finetuning/results/draco_finetuned_pilot \
   --dry-run
 ```

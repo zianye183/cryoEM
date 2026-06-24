@@ -25,7 +25,7 @@ The pipeline should answer one question before any production-scale training:
 Use this external read-only dataset path for the initial pilot. Do not import or copy the dataset into `zy223/finetuning`:
 
 ```text
-/nfs/bartesaghilab/micromon/research-bartesaghilab-06/shared/users/zy223@duke.edu/projects/Prestin-test-WNXj0kBZzgoPdMbE/sp-preprocessing-ghcTLDemYJJ8gcXE/mrc
+/nfs/bartesaghilab/micromon/research-bartesaghilab-06/shared/users/zy223@duke.edu/projects/Prestin-test-WNXj0kBZzgoPdMbE/sp-preprocessing-gkym1IT0yo4s7y1L/mrc
 ```
 
 This directory should contain complete micrographs plus even/odd split files. The current split naming convention is:

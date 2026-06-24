@@ -14,11 +14,16 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path("/nfs/bartesaghilab2/zy223/finetuning")
+DEFAULT_FINETUNING_DATA_DIR = Path("/nfs/bartesaghilab2/zy223/data/finetuning_data")
 DEFAULT_SAMPLE_DATASET = Path(
     "/nfs/bartesaghilab/micromon/research-bartesaghilab-06/shared/users/zy223@duke.edu/"
-    "projects/Prestin-test-WNXj0kBZzgoPdMbE/sp-preprocessing-ghcTLDemYJJ8gcXE/mrc"
+    "projects/Prestin-test-WNXj0kBZzgoPdMbE/sp-preprocessing-gkym1IT0yo4s7y1L/mrc"
 )
-DEFAULT_MANIFEST_DIR = PROJECT_ROOT / "data" / "manifests" / "topaz_pilot"
+DEFAULT_ACCEPTED_EXPOSURES_CS = Path(
+    "/nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/exports/groups/"
+    "J164_exposures_accepted/J164_exposures_accepted_exported.cs"
+)
+DEFAULT_MANIFEST_DIR = DEFAULT_FINETUNING_DATA_DIR / "topaz_prestin"
 DEFAULT_RESULTS_DIR = PROJECT_ROOT / "results"
 
 PAIR_COLUMNS = [
@@ -27,6 +32,12 @@ PAIR_COLUMNS = [
     "odd_path",
     "complete_path",
     "mask_path",
+    "source_micrograph_path",
+    "cryosparc_uid",
+    "ctf_fit_to_a",
+    "df1_a",
+    "df2_a",
+    "ice_thickness_rel",
     "session_id",
     "defocus_group",
     "pixel_size_a",

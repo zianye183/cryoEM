@@ -9,13 +9,14 @@ project:
 
 inputs:
     # Source data remains external/read-only; do not import or copy it into this project tree.
-    sample_dataset_dir: /nfs/bartesaghilab/micromon/research-bartesaghilab-06/shared/users/zy223@duke.edu/projects/Prestin-test-WNXj0kBZzgoPdMbE/sp-preprocessing-ghcTLDemYJJ8gcXE/mrc
+    sample_dataset_dir: /nfs/bartesaghilab/micromon/research-bartesaghilab-06/shared/users/zy223@duke.edu/projects/Prestin-test-WNXj0kBZzgoPdMbE/sp-preprocessing-gkym1IT0yo4s7y1L/mrc
 
     # Option A: build the manifest from one directory containing complete micrographs plus half splits.
-    source_dir: /nfs/bartesaghilab/micromon/research-bartesaghilab-06/shared/users/zy223@duke.edu/projects/Prestin-test-WNXj0kBZzgoPdMbE/sp-preprocessing-ghcTLDemYJJ8gcXE/mrc
+    source_dir: /nfs/bartesaghilab/micromon/research-bartesaghilab-06/shared/users/zy223@duke.edu/projects/Prestin-test-WNXj0kBZzgoPdMbE/sp-preprocessing-gkym1IT0yo4s7y1L/mrc
     even_dir: null
     odd_dir: null
     mask_dir: null
+    accepted_cs: /nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/exports/groups/J164_exposures_accepted/J164_exposures_accepted_exported.cs
 
     # Option B: use a pre-existing manifest with columns defined in docs/topaz_finetuning_plan.md.
     all_pairs_tsv: null
@@ -26,18 +27,19 @@ inputs:
         mask_suffix: _mask.mrc
 
 manifests:
-    output_dir: /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot
-    all_pairs: /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/all_pairs.tsv
-    train_pairs: /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/train_pairs.tsv
-    val_pairs: /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/val_pairs.tsv
-    test_pairs: /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/test_pairs.tsv
-    visual_panel: /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/visual_panel.tsv
+    output_dir: /nfs/bartesaghilab2/zy223/data/finetuning_data/topaz_prestin
+    all_pairs: /nfs/bartesaghilab2/zy223/data/finetuning_data/topaz_prestin/all_pairs.tsv
+    train_pairs: /nfs/bartesaghilab2/zy223/data/finetuning_data/topaz_prestin/train_pairs.tsv
+    val_pairs: /nfs/bartesaghilab2/zy223/data/finetuning_data/topaz_prestin/val_pairs.tsv
+    test_pairs: /nfs/bartesaghilab2/zy223/data/finetuning_data/topaz_prestin/test_pairs.tsv
+    visual_panel: /nfs/bartesaghilab2/zy223/data/finetuning_data/topaz_prestin/visual_panel.tsv
 
 split:
-    pilot_total_pairs: 300
-    train_pairs: 240
-    val_pairs: 30
-    test_pairs: 30
+    total_pairs: 14862
+    train_pairs: 11890
+    val_pairs: 1486
+    test_pairs: 1486
+    visual_pairs: 24
     stratify_by: [] # e.g. [session_id, defocus_group] if metadata is available.
 
 masking:

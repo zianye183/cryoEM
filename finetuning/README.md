@@ -47,13 +47,35 @@ Generated denoised micrographs, checkpoints, and large result arrays should rema
 
 ## Current sample dataset
 
-Use this external read-only sample dataset path for the initial pilot; do not import or copy it here:
+Use this external read-only half-split dataset path for Prestin fine-tuning; do not import or copy it here:
 
 ```text
-/nfs/bartesaghilab/micromon/research-bartesaghilab-06/shared/users/zy223@duke.edu/projects/Prestin-test-WNXj0kBZzgoPdMbE/sp-preprocessing-ghcTLDemYJJ8gcXE/mrc
+/nfs/bartesaghilab/micromon/research-bartesaghilab-06/shared/users/zy223@duke.edu/projects/Prestin-test-WNXj0kBZzgoPdMbE/sp-preprocessing-gkym1IT0yo4s7y1L/mrc
 ```
 
 It should contain complete micrographs plus even/odd split files named with `_half1` and `_half2`.
+
+Accepted exposures are filtered from:
+
+```text
+/nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/exports/groups/J164_exposures_accepted/J164_exposures_accepted_exported.cs
+```
+
+Reusable manifests are written under:
+
+```text
+/nfs/bartesaghilab2/zy223/data/finetuning_data/topaz_prestin
+```
+
+Current generated split:
+
+```text
+all_pairs.tsv     14862 accepted even/odd pairs
+train_pairs.tsv   11890 pairs
+val_pairs.tsv      1486 pairs
+test_pairs.tsv     1486 pairs
+visual_panel.tsv     24 pairs
+```
 
 ## Start here
 
@@ -71,25 +93,25 @@ zy223/finetuning/configs/topaz_finetune_pilot.yaml
 
 ## Script workflow
 
-From the workspace root or `zy223`, generate a pilot manifest and split files without copying data:
+From the workspace root or `zy223`, generate the accepted-exposure manifest and split files without copying data:
 
 ```bash
 python /nfs/bartesaghilab2/zy223/finetuning/scripts/prepare_pairs.py \
-  --limit 300 \
   --skip-metadata
 
 python /nfs/bartesaghilab2/zy223/finetuning/scripts/split_pairs.py \
-  --limit 300 \
-  --train-count 240 \
-  --val-count 30 \
-  --test-count 30
+  --limit 0 \
+  --train-count 11890 \
+  --val-count 1486 \
+  --test-count 1486 \
+  --visual-count 24
 ```
 
 Run the pretrained Topaz baseline on held-out halves first:
 
 ```bash
 python /nfs/bartesaghilab2/zy223/finetuning/scripts/run_topaz_baseline.py \
-  --manifest /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/test_pairs.tsv \
+  --manifest /nfs/bartesaghilab2/zy223/data/finetuning_data/topaz_prestin/test_pairs.tsv \
   --output-dir /nfs/bartesaghilab2/zy223/finetuning/results/topaz_pretrained_pilot \
   --dry-run
 ```
@@ -98,8 +120,8 @@ Prepare and dry-run the fine-tuning launch command:
 
 ```bash
 python /nfs/bartesaghilab2/zy223/finetuning/scripts/run_topaz_finetune.py \
-  --train-manifest /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/train_pairs.tsv \
-  --val-manifest /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/val_pairs.tsv \
+  --train-manifest /nfs/bartesaghilab2/zy223/data/finetuning_data/topaz_prestin/train_pairs.tsv \
+  --val-manifest /nfs/bartesaghilab2/zy223/data/finetuning_data/topaz_prestin/val_pairs.tsv \
   --output-dir /nfs/bartesaghilab2/zy223/finetuning/results/topaz_finetuned_pilot \
   --dry-run
 ```
@@ -113,8 +135,8 @@ The public DRACO repo provides model/config/checkpoint loading and inference not
 ```bash
 /nfs/bartesaghilab2/zy223/venvs/draco311/bin/python \
   /nfs/bartesaghilab2/zy223/finetuning/scripts/run_draco_finetune.py \
-  --train-manifest /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/train_pairs.tsv \
-  --val-manifest /nfs/bartesaghilab2/zy223/finetuning/data/manifests/topaz_pilot/val_pairs.tsv \
+  --train-manifest /nfs/bartesaghilab2/zy223/data/finetuning_data/topaz_prestin/train_pairs.tsv \
+  --val-manifest /nfs/bartesaghilab2/zy223/data/finetuning_data/topaz_prestin/val_pairs.tsv \
   --output-dir /nfs/bartesaghilab2/zy223/finetuning/results/draco_finetuned_pilot \
   --dry-run
 ```

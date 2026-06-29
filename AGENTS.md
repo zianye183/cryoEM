@@ -46,6 +46,7 @@
   - The CLI still defaults `--arch` to `unet_4`. SPA SimSiam exploration should explicitly use a SimSiam architecture such as `--arch simsiam2d_18` until the defaulting/validation path is fixed.
   - `opts.py` currently hardcodes `opt.data_dir` to `<repo>/data`. SPA manifests generated elsewhere must be copied under `data` or passed through paths that resolve from that directory until a configurable `--data_dir` option is added.
 - Prestin is the target dataset for the SPA work. Nearby project context exists under `segmentation_integration`, including Prestin CryoSPARC export references and `.cs` utilities.
+- A newer non-Prestin SPA dataset is SARS-CoV-2 under CryoSPARC project `CS-other-datasets`. Its ready micrograph/exposure export is `/nfs/bartesaghilab2/zy223/cryosparc/other_datasets/CS-other-datasets/exports/groups/J4_exposures`, and its pixel size is `1.061 A`.
 
 ## Local Data Skeleton
 

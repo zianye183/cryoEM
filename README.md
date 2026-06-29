@@ -163,6 +163,8 @@ Ignore `__pycache__/`, `.DS_Store`, local virtual environments, external tool ch
   `/nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/exports/groups/J71_particles`
 - DRACO segmentation/pick-filter preset particles:
   `/nfs/bartesaghilab2/zy223/cryosparc/Prestin/CS-prestin/exports/groups/J70_particles`
+- SARS-CoV-2 SPA micrographs/exposures for `CS-other-datasets`, pixel size `1.061 A`:
+  `/nfs/bartesaghilab2/zy223/cryosparc/other_datasets/CS-other-datasets/exports/groups/J4_exposures`
 
 ### External tools and environments
 
